@@ -1,18 +1,12 @@
 from fastapi import APIRouter
-from pydantic import BaseModel, EmailStr
+
+from apps.api.schemas import LeadCreate
 
 
-router = APIRouter(prefix="/leads", tags=["leads"])
+router = APIRouter()
 
 
-class LeadCreate(BaseModel):
-    name: str
-    email: EmailStr
-    source: str
-    notes: str | None = None
-
-
-@router.post("")
+@router.post("/leads")
 def create_lead(payload: LeadCreate) -> dict:
     return {
         "message": "lead received",
