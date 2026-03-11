@@ -1,0 +1,13 @@
+services:
+  workspace:
+    build:
+      context: .
+      dockerfile: .devcontainer/Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/workspace
+    env_file:
+      - .env
+    working_dir: /workspace
+    command: ["tail", "-f", "/dev/null"]
