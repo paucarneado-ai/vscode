@@ -1,7 +1,13 @@
 from fastapi import APIRouter, HTTPException
 
 from apps.api.db import get_db
-from apps.api.schemas import LeadCreate, LeadCreateResult, LeadPackResponse, LeadResponse
+from apps.api.schemas import (
+    LeadCreate,
+    LeadCreateResult,
+    LeadDeliveryResponse,
+    LeadPackResponse,
+    LeadResponse,
+)
 from apps.api.services.leadpack import build_summary, get_rating
 from apps.api.services.scoring import calculate_lead_score
 
@@ -65,4 +71,17 @@ def get_lead_pack(lead_id: int) -> LeadPackResponse:
         score=lead["score"],
         rating=rating,
         summary=summary,
+    )
+
+
+@router.get("/leads/{lead_id}/delivery", response_model=LeadDeliveryResponse)
+def get_lead_delivery(lead_id: int) -> LeadDeliveryResponse:
+    pack = get_lead_pack(lead_id)
+    return LeadDeliveryResponse(
+        lead_id=pack.lead_id,
+        delivery_status="generated",
+        channel="api",
+        generated_at=pack.created_at,
+        pack=pack,
+        message="Lead pack generated and ready for delivery",
     )

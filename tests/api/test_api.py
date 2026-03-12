@@ -92,3 +92,23 @@ def test_get_lead_pack():
 def test_get_lead_pack_not_found():
     response = client.get("/leads/99999/pack")
     assert response.status_code == 404
+
+
+def test_get_lead_delivery():
+    response = client.post("/leads", json=VALID_LEAD)
+    lead_id = response.json()["lead"]["id"]
+
+    response = client.get(f"/leads/{lead_id}/delivery")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["lead_id"] == lead_id
+    assert data["delivery_status"] == "generated"
+    assert data["channel"] == "api"
+    assert "generated_at" in data
+    assert data["pack"]["rating"] == "medium"
+    assert "message" in data
+
+
+def test_get_lead_delivery_not_found():
+    response = client.get("/leads/99999/delivery")
+    assert response.status_code == 404

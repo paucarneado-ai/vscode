@@ -34,3 +34,12 @@ class LeadPackResponse(BaseModel):
     score: int
     rating: str
     summary: str
+
+
+class LeadDeliveryResponse(BaseModel):
+    lead_id: int
+    delivery_status: str
+    channel: str
+    generated_at: str
+    pack: LeadPackResponse
+    message: str
