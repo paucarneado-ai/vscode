@@ -1,5 +1,5 @@
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 
 from apps.api.db import get_db
 from apps.api.schemas import (
@@ -23,12 +23,27 @@ router = APIRouter()
 
 @router.post("/leads", response_model=LeadCreateResult)
 def create_lead(payload: LeadCreate) -> LeadCreateResult:
-    score = calculate_lead_score(payload.source, payload.notes)
+    source = payload.source.strip().lower()
+    email = payload.email.strip().lower()
+
     db = get_db()
+    existing = db.execute(
+        "SELECT * FROM leads WHERE email = ? AND source = ?", (email, source)
+    ).fetchone()
+    if existing is not None:
+        lead = LeadResponse(**dict(existing))
+        body = LeadCreateResult(
+            message="lead already exists",
+            lead=lead,
+            meta={"version": "v1", "status": "duplicate"},
+        )
+        return JSONResponse(status_code=409, content=body.model_dump())
+
+    score = calculate_lead_score(source, payload.notes)
 
     cursor = db.execute(
         "INSERT INTO leads (name, email, source, notes, score) VALUES (?, ?, ?, ?, ?)",
-        (payload.name, payload.email, payload.source, payload.notes, score),
+        (payload.name, email, source, payload.notes, score),
     )
     db.commit()
 
@@ -43,9 +58,43 @@ def create_lead(payload: LeadCreate) -> LeadCreateResult:
 
 
 @router.get("/leads", response_model=list[LeadResponse])
-def list_leads() -> list[LeadResponse]:
+def list_leads(
+    source: str | None = None,
+    min_score: int | None = Query(default=None, ge=0),
+    limit: int | None = Query(default=None, ge=1),
+    offset: int | None = Query(default=None, ge=0),
+    q: str | None = None,
+) -> list[LeadResponse]:
     db = get_db()
-    rows = db.execute("SELECT * FROM leads ORDER BY id DESC").fetchall()
+    query = "SELECT * FROM leads"
+    conditions: list[str] = []
+    params: list[str | int] = []
+
+    if source is not None:
+        conditions.append("source = ?")
+        params.append(source)
+    if min_score is not None:
+        conditions.append("score >= ?")
+        params.append(min_score)
+    if q is not None:
+        pattern = f"%{q}%"
+        conditions.append("(name LIKE ? OR email LIKE ? OR notes LIKE ?)")
+        params.extend([pattern, pattern, pattern])
+
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+    query += " ORDER BY id DESC"
+
+    if limit is not None:
+        query += " LIMIT ?"
+        params.append(limit)
+    if offset is not None:
+        if limit is None:
+            query += " LIMIT -1"
+        query += " OFFSET ?"
+        params.append(offset)
+
+    rows = db.execute(query, params).fetchall()
     return [LeadResponse(**dict(row)) for row in rows]
 
 
