@@ -1,14 +1,17 @@
 from fastapi import APIRouter
 
-from apps.api.schemas import LeadCreate
+from apps.api.schemas import LeadCreate, LeadCreateResult, LeadResponse
 
 
 router = APIRouter()
 
 
-@router.post("/leads")
-def create_lead(payload: LeadCreate) -> dict:
-    return {
-        "message": "lead received",
-        "lead": payload.model_dump(),
-    }
+@router.post("/leads", response_model=LeadCreateResult)
+def create_lead(payload: LeadCreate) -> LeadCreateResult:
+    lead = LeadResponse(**payload.model_dump())
+
+    return LeadCreateResult(
+        message="lead received",
+        lead=lead,
+        meta={"version": "v1", "status": "accepted"},
+    )

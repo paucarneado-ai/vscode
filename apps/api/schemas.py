@@ -6,3 +6,16 @@ class LeadCreate(BaseModel):
     email: EmailStr
     source: str = Field(min_length=1)
     notes: str | None = None
+
+
+class LeadResponse(BaseModel):
+    name: str
+    email: EmailStr
+    source: str
+    notes: str | None = None
+
+
+class LeadCreateResult(BaseModel):
+    message: str
+    lead: LeadResponse
+    meta: dict[str, str]
