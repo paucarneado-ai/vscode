@@ -98,6 +98,34 @@ def list_leads(
     return [LeadResponse(**dict(row)) for row in rows]
 
 
+@router.get("/leads/summary")
+def get_leads_summary() -> dict:
+    db = get_db()
+
+    row = db.execute(
+        "SELECT COUNT(*) AS total, COALESCE(AVG(score), 0) AS avg_score FROM leads"
+    ).fetchone()
+    total_leads = row["total"]
+    average_score = round(row["avg_score"], 1)
+
+    high_score_row = db.execute(
+        "SELECT COUNT(*) AS cnt FROM leads WHERE score >= 60"
+    ).fetchone()
+    high_score_count = high_score_row["cnt"]
+
+    source_rows = db.execute(
+        "SELECT source, COUNT(*) AS cnt FROM leads GROUP BY source ORDER BY cnt DESC"
+    ).fetchall()
+    counts_by_source = {r["source"]: r["cnt"] for r in source_rows}
+
+    return {
+        "total_leads": total_leads,
+        "average_score": average_score,
+        "high_score_count": high_score_count,
+        "counts_by_source": counts_by_source,
+    }
+
+
 @router.get("/leads/{lead_id}", response_model=LeadResponse)
 def get_lead(lead_id: int) -> LeadResponse:
     db = get_db()

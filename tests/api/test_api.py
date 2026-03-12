@@ -392,3 +392,38 @@ def test_search_leads_with_limit_offset():
     assert len(offset_data) == len(all_data) - 2
     # ORDER BY id DESC preserved
     assert all_data[0]["id"] > all_data[-1]["id"]
+
+
+# --- Summary ---
+
+
+def test_leads_summary_structure():
+    resp = client.get("/leads/summary")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "total_leads" in data
+    assert "average_score" in data
+    assert "high_score_count" in data
+    assert "counts_by_source" in data
+    assert isinstance(data["counts_by_source"], dict)
+
+
+def test_leads_summary_values():
+    # Create leads with known source and score
+    client.post("/leads", json={
+        "name": "Sum1", "email": "sum1@summary.com",
+        "source": "summary_src", "notes": "interested in demo",
+    })
+    client.post("/leads", json={
+        "name": "Sum2", "email": "sum2@summary.com",
+        "source": "summary_src", "notes": "",
+    })
+
+    resp = client.get("/leads/summary")
+    data = resp.json()
+
+    assert data["total_leads"] >= 2
+    assert data["average_score"] > 0
+    assert data["counts_by_source"]["summary_src"] == 2
+    assert data["high_score_count"] >= 0
+    assert data["high_score_count"] <= data["total_leads"]
