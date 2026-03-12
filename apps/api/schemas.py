@@ -9,11 +9,13 @@ class LeadCreate(BaseModel):
 
 
 class LeadResponse(BaseModel):
+    id: int
     name: str
     email: EmailStr
     source: str
     notes: str | None = None
     score: int
+    created_at: str
 
 
 class LeadCreateResult(BaseModel):
