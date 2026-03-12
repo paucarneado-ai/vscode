@@ -1,3 +1,5 @@
+import csv
+import io
 import tempfile
 
 import apps.api.db as db_module
@@ -432,6 +434,11 @@ def test_leads_summary_values():
 # --- CSV Export ---
 
 
+def _parse_csv(text: str) -> list[list[str]]:
+    """Parse CSV response text into rows using csv.reader."""
+    return list(csv.reader(io.StringIO(text)))
+
+
 def test_export_csv_status_and_content_type():
     resp = client.get("/leads/export.csv")
     assert resp.status_code == 200
@@ -441,8 +448,8 @@ def test_export_csv_status_and_content_type():
 
 def test_export_csv_header_row():
     resp = client.get("/leads/export.csv")
-    lines = resp.text.strip().splitlines()
-    assert lines[0] == "id,name,email,source,score,notes,created_at"
+    rows = _parse_csv(resp.text)
+    assert rows[0] == ["id", "name", "email", "source", "score", "notes"]
 
 
 def test_export_csv_content_and_order():
@@ -456,12 +463,15 @@ def test_export_csv_content_and_order():
         "source": "csv_export", "notes": "note b",
     })
     resp = client.get("/leads/export.csv", params={"source": "csv_export"})
-    lines = resp.text.strip().splitlines()
-    assert len(lines) >= 3  # header + 2 data rows
+    rows = _parse_csv(resp.text)
+    header = rows[0]
+    data_rows = [r for r in rows[1:] if r]  # skip empty trailing rows
+    assert len(data_rows) >= 2
+    # Each row has same number of columns as header
+    assert all(len(r) == len(header) for r in data_rows)
     # ORDER BY id DESC: first data row has higher id
-    row1_id = int(lines[1].split(",")[0])
-    row2_id = int(lines[2].split(",")[0])
-    assert row1_id > row2_id
+    id_col = header.index("id")
+    assert int(data_rows[0][id_col]) > int(data_rows[1][id_col])
 
 
 def test_export_csv_with_filters():
@@ -469,18 +479,25 @@ def test_export_csv_with_filters():
         "name": "CsvFilter", "email": "csvf@export.com",
         "source": "csv_filtered", "notes": "csv_kw_unique",
     })
+    header_expected = ["id", "name", "email", "source", "score", "notes"]
+
     # source filter
     resp = client.get("/leads/export.csv", params={"source": "csv_filtered"})
-    lines = resp.text.strip().splitlines()
-    assert len(lines) >= 2
-    assert "csv_filtered" in lines[1]
+    rows = _parse_csv(resp.text)
+    assert rows[0] == header_expected
+    data_rows = [r for r in rows[1:] if r]
+    assert len(data_rows) >= 1
+    source_col = rows[0].index("source")
+    assert all(r[source_col] == "csv_filtered" for r in data_rows)
 
     # q filter
     resp = client.get("/leads/export.csv", params={"q": "csv_kw_unique"})
-    lines = resp.text.strip().splitlines()
-    assert len(lines) >= 2
+    rows = _parse_csv(resp.text)
+    data_rows = [r for r in rows[1:] if r]
+    assert len(data_rows) >= 1
 
     # limit
     resp = client.get("/leads/export.csv", params={"limit": 1})
-    lines = resp.text.strip().splitlines()
-    assert len(lines) == 2  # header + 1 row
+    rows = _parse_csv(resp.text)
+    data_rows = [r for r in rows[1:] if r]
+    assert len(data_rows) == 1

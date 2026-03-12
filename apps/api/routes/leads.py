@@ -140,7 +140,7 @@ def get_leads_summary() -> dict:
     }
 
 
-CSV_COLUMNS = ["id", "name", "email", "source", "score", "notes", "created_at"]
+CSV_COLUMNS = ["id", "name", "email", "source", "score", "notes"]
 
 
 @router.get("/leads/export.csv", response_class=PlainTextResponse)
