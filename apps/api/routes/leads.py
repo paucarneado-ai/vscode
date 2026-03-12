@@ -135,12 +135,17 @@ def get_leads_summary(
     total_leads = row["total"]
     average_score = round(row["avg_score"], 1)
 
-    high_score_where = where + (" AND " if where else " WHERE ") + "score >= 60"
-    high_score_row = db.execute(
-        f"SELECT COUNT(*) AS cnt FROM leads{high_score_where}",
+    bucket_row = db.execute(
+        f"SELECT"
+        f" SUM(CASE WHEN score < 40 THEN 1 ELSE 0 END) AS low,"
+        f" SUM(CASE WHEN score >= 40 AND score < 60 THEN 1 ELSE 0 END) AS medium,"
+        f" SUM(CASE WHEN score >= 60 THEN 1 ELSE 0 END) AS high"
+        f" FROM leads{where}",
         params,
     ).fetchone()
-    high_score_count = high_score_row["cnt"]
+    low_score_count = bucket_row["low"] or 0
+    medium_score_count = bucket_row["medium"] or 0
+    high_score_count = bucket_row["high"] or 0
 
     source_rows = db.execute(
         f"SELECT source, COUNT(*) AS cnt FROM leads{where} GROUP BY source ORDER BY cnt DESC",
@@ -151,6 +156,8 @@ def get_leads_summary(
     return {
         "total_leads": total_leads,
         "average_score": average_score,
+        "low_score_count": low_score_count,
+        "medium_score_count": medium_score_count,
         "high_score_count": high_score_count,
         "counts_by_source": counts_by_source,
     }

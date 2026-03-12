@@ -491,6 +491,8 @@ def test_leads_summary_structure():
     data = resp.json()
     assert "total_leads" in data
     assert "average_score" in data
+    assert "low_score_count" in data
+    assert "medium_score_count" in data
     assert "high_score_count" in data
     assert "counts_by_source" in data
     assert isinstance(data["counts_by_source"], dict)
@@ -514,7 +516,42 @@ def test_leads_summary_values():
     assert data["average_score"] > 0
     assert data["counts_by_source"]["summary_src"] == 2
     assert data["high_score_count"] >= 0
-    assert data["high_score_count"] <= data["total_leads"]
+    assert data["low_score_count"] + data["medium_score_count"] + data["high_score_count"] == data["total_leads"]
+
+
+def test_leads_summary_buckets_with_known_scores():
+    # source "test" + notes -> score 70 (high: >= 60)
+    client.post("/leads", json={
+        "name": "BucketHi", "email": "buckhi@bucket.com",
+        "source": "test", "notes": "interested in demo",
+    })
+    # source with no bonus + no notes -> score 50 (medium: 40-59)
+    client.post("/leads", json={
+        "name": "BucketMed", "email": "buckmed@bucket.com",
+        "source": "bucket_unknown", "notes": "",
+    })
+    resp = client.get("/leads/summary", params={"source": "bucket_unknown"})
+    data = resp.json()
+    assert data["medium_score_count"] >= 1
+
+    resp = client.get("/leads/summary", params={"source": "test"})
+    data = resp.json()
+    assert data["high_score_count"] >= 1
+
+
+def test_leads_summary_buckets_filtered_by_source():
+    client.post("/leads", json={
+        "name": "BFilt1", "email": "bfilt1@bucket.com",
+        "source": "bucket_filt", "notes": "interested in demo",
+    })
+    client.post("/leads", json={
+        "name": "BFilt2", "email": "bfilt2@bucket.com",
+        "source": "bucket_filt", "notes": "",
+    })
+    resp = client.get("/leads/summary", params={"source": "bucket_filt"})
+    data = resp.json()
+    assert data["low_score_count"] + data["medium_score_count"] + data["high_score_count"] == data["total_leads"]
+    assert data["total_leads"] == 2
 
 
 def test_leads_summary_filtered_by_source():
@@ -582,8 +619,9 @@ def test_leads_summary_filtered_high_score_count():
     })
     resp = client.get("/leads/summary", params={"source": "sum_hiscore"})
     data = resp.json()
-    # high_score_count should be consistent with the filtered subset
+    # buckets should be consistent with the filtered subset
     assert data["high_score_count"] <= data["total_leads"]
+    assert data["low_score_count"] + data["medium_score_count"] + data["high_score_count"] == data["total_leads"]
 
 
 # --- CSV Export ---
