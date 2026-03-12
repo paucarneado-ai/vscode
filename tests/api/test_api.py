@@ -246,6 +246,51 @@ def test_list_leads_invalid_min_score():
     assert response.status_code == 422
 
 
+# --- POST /leads contract ---
+
+
+def test_create_lead_response_meta():
+    r = client.post("/leads", json={**VALID_LEAD, "email": "meta@contract.com", "source": "meta_src"})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["meta"]["version"] == "v1"
+    assert data["meta"]["status"] == "accepted"
+
+
+def test_create_lead_without_notes():
+    r = client.post("/leads", json={"name": "No Notes", "email": "nonotes@contract.com", "source": "contract"})
+    assert r.status_code == 200
+    lead = r.json()["lead"]
+    assert lead["notes"] is None
+
+
+def test_create_lead_invalid_email_format():
+    r = client.post("/leads", json={**VALID_LEAD, "email": "not-an-email"})
+    assert r.status_code == 422
+
+
+def test_create_lead_duplicate_preserves_original():
+    original = {**VALID_LEAD, "email": "preserve@contract.com", "source": "preserve_src"}
+    r1 = client.post("/leads", json=original)
+    assert r1.status_code == 200
+    original_lead = r1.json()["lead"]
+
+    # Retry with different name — 409 should return original data, not the retry
+    r2 = client.post("/leads", json={**original, "name": "Different Name"})
+    assert r2.status_code == 409
+    dup_lead = r2.json()["lead"]
+    assert dup_lead["id"] == original_lead["id"]
+    assert dup_lead["name"] == original_lead["name"]  # original name, not "Different Name"
+
+
+def test_create_lead_whitespace_only_source():
+    # Edge: " " passes min_length=1 but strip() gives "".
+    # Documenting current behavior — source is stored as empty string.
+    r = client.post("/leads", json={**VALID_LEAD, "email": "ws@contract.com", "source": " "})
+    assert r.status_code == 200
+    assert r.json()["lead"]["source"] == ""
+
+
 def test_create_lead_normalizes_source():
     response = client.post("/leads", json={**VALID_LEAD, "source": "  WebSite  "})
     assert response.status_code == 200
