@@ -152,6 +152,47 @@ def test_get_lead_delivery_not_found():
     assert response.status_code == 404
 
 
+def test_get_lead_delivery_response_structure():
+    r = client.post("/leads", json={**VALID_LEAD, "email": "delstruct@delivery.com", "source": "del_struct"})
+    lead_id = r.json()["lead"]["id"]
+
+    resp = client.get(f"/leads/{lead_id}/delivery")
+    assert resp.status_code == 200
+    data = resp.json()
+
+    # All top-level fields present with expected types
+    assert isinstance(data["lead_id"], int)
+    assert isinstance(data["delivery_status"], str)
+    assert isinstance(data["channel"], str)
+    assert isinstance(data["generated_at"], str)
+    assert isinstance(data["message"], str)
+    assert isinstance(data["pack"], dict)
+
+    # Pack has all expected fields
+    pack = data["pack"]
+    for field in ["lead_id", "created_at", "name", "email", "source", "notes", "score", "rating", "summary"]:
+        assert field in pack, f"missing field '{field}' in pack"
+
+
+def test_get_lead_delivery_pack_consistent_with_standalone():
+    r = client.post("/leads", json={**VALID_LEAD, "email": "delcon@delivery.com", "source": "del_consist"})
+    lead_id = r.json()["lead"]["id"]
+
+    pack_resp = client.get(f"/leads/{lead_id}/pack").json()
+    delivery_resp = client.get(f"/leads/{lead_id}/delivery").json()
+
+    # Embedded pack should match standalone pack
+    assert delivery_resp["pack"] == pack_resp
+
+
+def test_get_lead_delivery_generated_at_matches_created():
+    r = client.post("/leads", json={**VALID_LEAD, "email": "deltime@delivery.com", "source": "del_time"})
+    lead_id = r.json()["lead"]["id"]
+
+    data = client.get(f"/leads/{lead_id}/delivery").json()
+    assert data["generated_at"] == data["pack"]["created_at"]
+
+
 def test_list_leads_filter_by_source():
     client.post("/leads", json={**VALID_LEAD, "source": "filterable"})
     response = client.get("/leads", params={"source": "filterable"})
