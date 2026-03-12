@@ -427,3 +427,60 @@ def test_leads_summary_values():
     assert data["counts_by_source"]["summary_src"] == 2
     assert data["high_score_count"] >= 0
     assert data["high_score_count"] <= data["total_leads"]
+
+
+# --- CSV Export ---
+
+
+def test_export_csv_status_and_content_type():
+    resp = client.get("/leads/export.csv")
+    assert resp.status_code == 200
+    assert "text/csv" in resp.headers["content-type"]
+    assert "attachment" in resp.headers.get("content-disposition", "")
+
+
+def test_export_csv_header_row():
+    resp = client.get("/leads/export.csv")
+    lines = resp.text.strip().splitlines()
+    assert lines[0] == "id,name,email,source,score,notes,created_at"
+
+
+def test_export_csv_content_and_order():
+    # Create leads with unique source
+    client.post("/leads", json={
+        "name": "CsvA", "email": "csva@export.com",
+        "source": "csv_export", "notes": "note a",
+    })
+    client.post("/leads", json={
+        "name": "CsvB", "email": "csvb@export.com",
+        "source": "csv_export", "notes": "note b",
+    })
+    resp = client.get("/leads/export.csv", params={"source": "csv_export"})
+    lines = resp.text.strip().splitlines()
+    assert len(lines) >= 3  # header + 2 data rows
+    # ORDER BY id DESC: first data row has higher id
+    row1_id = int(lines[1].split(",")[0])
+    row2_id = int(lines[2].split(",")[0])
+    assert row1_id > row2_id
+
+
+def test_export_csv_with_filters():
+    client.post("/leads", json={
+        "name": "CsvFilter", "email": "csvf@export.com",
+        "source": "csv_filtered", "notes": "csv_kw_unique",
+    })
+    # source filter
+    resp = client.get("/leads/export.csv", params={"source": "csv_filtered"})
+    lines = resp.text.strip().splitlines()
+    assert len(lines) >= 2
+    assert "csv_filtered" in lines[1]
+
+    # q filter
+    resp = client.get("/leads/export.csv", params={"q": "csv_kw_unique"})
+    lines = resp.text.strip().splitlines()
+    assert len(lines) >= 2
+
+    # limit
+    resp = client.get("/leads/export.csv", params={"limit": 1})
+    lines = resp.text.strip().splitlines()
+    assert len(lines) == 2  # header + 1 row

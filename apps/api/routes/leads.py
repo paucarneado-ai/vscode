@@ -1,3 +1,6 @@
+import csv
+import io
+
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 
@@ -57,15 +60,13 @@ def create_lead(payload: LeadCreate) -> LeadCreateResult:
     )
 
 
-@router.get("/leads", response_model=list[LeadResponse])
-def list_leads(
+def _build_leads_query(
     source: str | None = None,
-    min_score: int | None = Query(default=None, ge=0),
-    limit: int | None = Query(default=None, ge=1),
-    offset: int | None = Query(default=None, ge=0),
+    min_score: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
     q: str | None = None,
-) -> list[LeadResponse]:
-    db = get_db()
+) -> tuple[str, list[str | int]]:
     query = "SELECT * FROM leads"
     conditions: list[str] = []
     params: list[str | int] = []
@@ -94,6 +95,19 @@ def list_leads(
         query += " OFFSET ?"
         params.append(offset)
 
+    return query, params
+
+
+@router.get("/leads", response_model=list[LeadResponse])
+def list_leads(
+    source: str | None = None,
+    min_score: int | None = Query(default=None, ge=0),
+    limit: int | None = Query(default=None, ge=1),
+    offset: int | None = Query(default=None, ge=0),
+    q: str | None = None,
+) -> list[LeadResponse]:
+    db = get_db()
+    query, params = _build_leads_query(source, min_score, limit, offset, q)
     rows = db.execute(query, params).fetchall()
     return [LeadResponse(**dict(row)) for row in rows]
 
@@ -124,6 +138,35 @@ def get_leads_summary() -> dict:
         "high_score_count": high_score_count,
         "counts_by_source": counts_by_source,
     }
+
+
+CSV_COLUMNS = ["id", "name", "email", "source", "score", "notes", "created_at"]
+
+
+@router.get("/leads/export.csv", response_class=PlainTextResponse)
+def export_leads_csv(
+    source: str | None = None,
+    min_score: int | None = Query(default=None, ge=0),
+    limit: int | None = Query(default=None, ge=1),
+    offset: int | None = Query(default=None, ge=0),
+    q: str | None = None,
+) -> PlainTextResponse:
+    db = get_db()
+    query, params = _build_leads_query(source, min_score, limit, offset, q)
+    rows = db.execute(query, params).fetchall()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(CSV_COLUMNS)
+    for row in rows:
+        d = dict(row)
+        writer.writerow([d[col] for col in CSV_COLUMNS])
+
+    return PlainTextResponse(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=leads.csv"},
+    )
 
 
 @router.get("/leads/{lead_id}", response_model=LeadResponse)
