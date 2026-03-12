@@ -24,8 +24,8 @@ from apps.api.services.scoring import calculate_lead_score
 router = APIRouter()
 
 
-@router.post("/leads", response_model=LeadCreateResult)
-def create_lead(payload: LeadCreate) -> LeadCreateResult:
+def _create_lead_internal(payload: LeadCreate) -> tuple[LeadCreateResult, int]:
+    """Create a lead and return (result, http_status)."""
     source = payload.source.strip().lower()
     email = payload.email.strip().lower()
 
@@ -35,12 +35,12 @@ def create_lead(payload: LeadCreate) -> LeadCreateResult:
     ).fetchone()
     if existing is not None:
         lead = LeadResponse(**dict(existing))
-        body = LeadCreateResult(
+        result = LeadCreateResult(
             message="lead already exists",
             lead=lead,
             meta={"version": "v1", "status": "duplicate"},
         )
-        return JSONResponse(status_code=409, content=body.model_dump())
+        return result, 409
 
     score = calculate_lead_score(source, payload.notes)
 
@@ -53,11 +53,44 @@ def create_lead(payload: LeadCreate) -> LeadCreateResult:
     row = db.execute("SELECT * FROM leads WHERE id = ?", (cursor.lastrowid,)).fetchone()
     lead = LeadResponse(**dict(row))
 
-    return LeadCreateResult(
+    result = LeadCreateResult(
         message="lead received",
         lead=lead,
         meta={"version": "v1", "status": "accepted"},
     )
+    return result, 200
+
+
+@router.post("/leads", response_model=LeadCreateResult)
+def create_lead(payload: LeadCreate) -> LeadCreateResult:
+    result, status = _create_lead_internal(payload)
+    if status == 409:
+        return JSONResponse(status_code=409, content=result.model_dump())
+    return result
+
+
+@router.post("/leads/ingest")
+def ingest_leads(items: list[LeadCreate]) -> dict:
+    created = 0
+    duplicates = 0
+    errors: list[dict] = []
+
+    for i, item in enumerate(items):
+        try:
+            _, status = _create_lead_internal(item)
+            if status == 200:
+                created += 1
+            elif status == 409:
+                duplicates += 1
+        except Exception as exc:
+            errors.append({"index": i, "email": item.email, "error": str(exc)})
+
+    return {
+        "total": len(items),
+        "created": created,
+        "duplicates": duplicates,
+        "errors": errors,
+    }
 
 
 def _build_where_clause(

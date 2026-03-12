@@ -694,3 +694,87 @@ def test_export_csv_with_filters():
     rows = _parse_csv(resp.text)
     data_rows = [r for r in rows[1:] if r]
     assert len(data_rows) == 1
+
+
+# --- Ingest (batch) ---
+
+
+def test_ingest_leads_valid_batch():
+    items = [
+        {"name": "Ing1", "email": "ing1@ingest.com", "source": "webhook", "notes": "batch"},
+        {"name": "Ing2", "email": "ing2@ingest.com", "source": "webhook", "notes": "batch"},
+    ]
+    resp = client.post("/leads/ingest", json=items)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 2
+    assert data["created"] == 2
+    assert data["duplicates"] == 0
+    assert data["errors"] == []
+
+
+def test_ingest_leads_with_duplicates():
+    items = [
+        {"name": "IngDup", "email": "ingdup@ingest.com", "source": "webhook", "notes": ""},
+    ]
+    # First call creates
+    r1 = client.post("/leads/ingest", json=items)
+    assert r1.json()["created"] == 1
+
+    # Second call detects duplicate
+    r2 = client.post("/leads/ingest", json=items)
+    data = r2.json()
+    assert data["total"] == 1
+    assert data["created"] == 0
+    assert data["duplicates"] == 1
+
+
+def test_ingest_leads_mixed_new_and_duplicate():
+    # Create one lead first
+    client.post("/leads", json={
+        "name": "PreExist", "email": "preexist@ingest.com",
+        "source": "ingest_mix", "notes": "",
+    })
+    items = [
+        {"name": "PreExist", "email": "preexist@ingest.com", "source": "ingest_mix", "notes": ""},
+        {"name": "NewIng", "email": "newing@ingest.com", "source": "ingest_mix", "notes": "fresh"},
+    ]
+    resp = client.post("/leads/ingest", json=items)
+    data = resp.json()
+    assert data["total"] == 2
+    assert data["created"] == 1
+    assert data["duplicates"] == 1
+
+
+def test_ingest_leads_empty_list():
+    resp = client.post("/leads/ingest", json=[])
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 0
+    assert data["created"] == 0
+    assert data["duplicates"] == 0
+
+
+def test_ingest_leads_invalid_item():
+    items = [{"name": "", "email": "not-valid"}]  # invalid payload
+    resp = client.post("/leads/ingest", json=items)
+    assert resp.status_code == 422
+
+
+def test_ingest_leads_does_not_break_post_leads():
+    # Ingest a lead
+    client.post("/leads/ingest", json=[
+        {"name": "IngCheck", "email": "ingcheck@ingest.com", "source": "ingest_compat", "notes": ""},
+    ])
+    # Verify it shows up via GET /leads
+    resp = client.get("/leads", params={"source": "ingest_compat"})
+    data = resp.json()
+    assert len(data) >= 1
+    assert data[0]["email"] == "ingcheck@ingest.com"
+
+    # POST /leads still works for new leads
+    r = client.post("/leads", json={
+        "name": "PostAfter", "email": "postafter@ingest.com",
+        "source": "ingest_compat", "notes": "",
+    })
+    assert r.status_code == 200
