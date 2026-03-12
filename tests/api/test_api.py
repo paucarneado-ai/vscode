@@ -476,6 +476,75 @@ def test_leads_summary_values():
     assert data["high_score_count"] <= data["total_leads"]
 
 
+def test_leads_summary_filtered_by_source():
+    client.post("/leads", json={
+        "name": "SrcSum1", "email": "srcsum1@summary.com",
+        "source": "sum_only", "notes": "interested in demo",
+    })
+    client.post("/leads", json={
+        "name": "SrcSum2", "email": "srcsum2@summary.com",
+        "source": "sum_only", "notes": "",
+    })
+    resp = client.get("/leads/summary", params={"source": "sum_only"})
+    data = resp.json()
+    assert data["total_leads"] == 2
+    assert "sum_only" in data["counts_by_source"]
+    assert len(data["counts_by_source"]) == 1  # only the filtered source
+
+
+def test_leads_summary_filtered_by_min_score():
+    # Create a lead with known score (source "test" + notes -> 70)
+    client.post("/leads", json={
+        "name": "ScoreSum", "email": "scoresum@summary.com",
+        "source": "test", "notes": "interested in demo",
+    })
+    # With very high min_score, this lead is excluded
+    resp_high = client.get("/leads/summary", params={"min_score": 9999})
+    assert resp_high.json()["total_leads"] == 0
+
+    # With low min_score, it's included
+    resp_low = client.get("/leads/summary", params={"min_score": 60})
+    assert resp_low.json()["total_leads"] >= 1
+
+
+def test_leads_summary_filtered_by_q():
+    client.post("/leads", json={
+        "name": "QSum", "email": "qsum@summary.com",
+        "source": "sum_q_src", "notes": "unique_sum_keyword_xyz",
+    })
+    resp = client.get("/leads/summary", params={"q": "unique_sum_keyword_xyz"})
+    data = resp.json()
+    assert data["total_leads"] == 1
+    assert data["counts_by_source"]["sum_q_src"] == 1
+
+
+def test_leads_summary_combined_filters():
+    client.post("/leads", json={
+        "name": "ComboSum", "email": "combosum@summary.com",
+        "source": "sum_combo", "notes": "combo_sum_kw",
+    })
+    # Both filters match
+    resp = client.get("/leads/summary", params={"source": "sum_combo", "q": "combo_sum_kw"})
+    data = resp.json()
+    assert data["total_leads"] == 1
+
+    # source matches but q doesn't
+    resp = client.get("/leads/summary", params={"source": "sum_combo", "q": "zzz_no_match"})
+    assert resp.json()["total_leads"] == 0
+
+
+def test_leads_summary_filtered_high_score_count():
+    # Create leads for a unique source, one high score one low
+    client.post("/leads", json={
+        "name": "HiSum", "email": "hisum@summary.com",
+        "source": "sum_hiscore", "notes": "interested in demo",  # score 60
+    })
+    resp = client.get("/leads/summary", params={"source": "sum_hiscore"})
+    data = resp.json()
+    # high_score_count should be consistent with the filtered subset
+    assert data["high_score_count"] <= data["total_leads"]
+
+
 # --- CSV Export ---
 
 

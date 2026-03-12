@@ -60,14 +60,11 @@ def create_lead(payload: LeadCreate) -> LeadCreateResult:
     )
 
 
-def _build_leads_query(
+def _build_where_clause(
     source: str | None = None,
     min_score: int | None = None,
-    limit: int | None = None,
-    offset: int | None = None,
     q: str | None = None,
 ) -> tuple[str, list[str | int]]:
-    query = "SELECT * FROM leads"
     conditions: list[str] = []
     params: list[str | int] = []
 
@@ -82,9 +79,19 @@ def _build_leads_query(
         conditions.append("(name LIKE ? OR email LIKE ? OR notes LIKE ?)")
         params.extend([pattern, pattern, pattern])
 
-    if conditions:
-        query += " WHERE " + " AND ".join(conditions)
-    query += " ORDER BY id DESC"
+    clause = " WHERE " + " AND ".join(conditions) if conditions else ""
+    return clause, params
+
+
+def _build_leads_query(
+    source: str | None = None,
+    min_score: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+    q: str | None = None,
+) -> tuple[str, list[str | int]]:
+    where, params = _build_where_clause(source, min_score, q)
+    query = "SELECT * FROM leads" + where + " ORDER BY id DESC"
 
     if limit is not None:
         query += " LIMIT ?"
@@ -113,22 +120,31 @@ def list_leads(
 
 
 @router.get("/leads/summary")
-def get_leads_summary() -> dict:
+def get_leads_summary(
+    source: str | None = None,
+    min_score: int | None = Query(default=None, ge=0),
+    q: str | None = None,
+) -> dict:
     db = get_db()
+    where, params = _build_where_clause(source, min_score, q)
 
     row = db.execute(
-        "SELECT COUNT(*) AS total, COALESCE(AVG(score), 0) AS avg_score FROM leads"
+        f"SELECT COUNT(*) AS total, COALESCE(AVG(score), 0) AS avg_score FROM leads{where}",
+        params,
     ).fetchone()
     total_leads = row["total"]
     average_score = round(row["avg_score"], 1)
 
+    high_score_where = where + (" AND " if where else " WHERE ") + "score >= 60"
     high_score_row = db.execute(
-        "SELECT COUNT(*) AS cnt FROM leads WHERE score >= 60"
+        f"SELECT COUNT(*) AS cnt FROM leads{high_score_where}",
+        params,
     ).fetchone()
     high_score_count = high_score_row["cnt"]
 
     source_rows = db.execute(
-        "SELECT source, COUNT(*) AS cnt FROM leads GROUP BY source ORDER BY cnt DESC"
+        f"SELECT source, COUNT(*) AS cnt FROM leads{where} GROUP BY source ORDER BY cnt DESC",
+        params,
     ).fetchall()
     counts_by_source = {r["source"]: r["cnt"] for r in source_rows}
 
