@@ -73,3 +73,22 @@ def test_get_lead_by_id():
 def test_get_lead_not_found():
     response = client.get("/leads/99999")
     assert response.status_code == 404
+
+
+def test_get_lead_pack():
+    response = client.post("/leads", json=VALID_LEAD)
+    lead_id = response.json()["lead"]["id"]
+
+    response = client.get(f"/leads/{lead_id}/pack")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["lead_id"] == lead_id
+    assert data["rating"] == "medium"  # score 70 -> medium
+    assert data["name"] == "Test User"
+    assert "summary" in data
+    assert "created_at" in data
+
+
+def test_get_lead_pack_not_found():
+    response = client.get("/leads/99999/pack")
+    assert response.status_code == 404

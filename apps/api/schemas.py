@@ -22,3 +22,15 @@ class LeadCreateResult(BaseModel):
     message: str
     lead: LeadResponse
     meta: dict[str, str]
+
+
+class LeadPackResponse(BaseModel):
+    lead_id: int
+    created_at: str
+    name: str
+    email: EmailStr
+    source: str
+    notes: str | None = None
+    score: int
+    rating: str
+    summary: str

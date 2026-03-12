@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException
 
 from apps.api.db import get_db
-from apps.api.schemas import LeadCreate, LeadCreateResult, LeadResponse
+from apps.api.schemas import LeadCreate, LeadCreateResult, LeadPackResponse, LeadResponse
+from apps.api.services.leadpack import build_summary, get_rating
 from apps.api.services.scoring import calculate_lead_score
 
 
@@ -43,3 +44,25 @@ def get_lead(lead_id: int) -> LeadResponse:
     if row is None:
         raise HTTPException(status_code=404, detail="Lead not found")
     return LeadResponse(**dict(row))
+
+
+@router.get("/leads/{lead_id}/pack", response_model=LeadPackResponse)
+def get_lead_pack(lead_id: int) -> LeadPackResponse:
+    db = get_db()
+    row = db.execute("SELECT * FROM leads WHERE id = ?", (lead_id,)).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    lead = dict(row)
+    rating = get_rating(lead["score"])
+    summary = build_summary(lead["name"], lead["source"], lead["score"], rating)
+    return LeadPackResponse(
+        lead_id=lead["id"],
+        created_at=lead["created_at"],
+        name=lead["name"],
+        email=lead["email"],
+        source=lead["source"],
+        notes=lead["notes"],
+        score=lead["score"],
+        rating=rating,
+        summary=summary,
+    )
