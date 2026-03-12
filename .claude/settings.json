@@ -43,5 +43,18 @@
       "Bash(git push --force*)",
       "Bash(git reset --hard*)"
     ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python scripts/hooks/blocked_paths_guard.py"
+          }
+        ]
+      }
+    ]
   }
 }
