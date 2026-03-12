@@ -33,3 +33,18 @@ def render_lead_pack_html(pack: LeadPackResponse) -> str:
         f"<p><strong>Created at:</strong> {e(pack.created_at)}</p>"
         "</body></html>"
     )
+
+
+def render_lead_pack_text(pack: LeadPackResponse) -> str:
+    notes = pack.notes if pack.notes else "—"
+    return (
+        f"Lead Pack #{pack.lead_id}\n"
+        f"Name: {pack.name}\n"
+        f"Email: {pack.email}\n"
+        f"Source: {pack.source}\n"
+        f"Notes: {notes}\n"
+        f"Score: {pack.score}\n"
+        f"Rating: {pack.rating}\n"
+        f"Summary: {pack.summary}\n"
+        f"Created at: {pack.created_at}\n"
+    )
