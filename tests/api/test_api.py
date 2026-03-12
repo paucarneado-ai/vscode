@@ -94,6 +94,24 @@ def test_get_lead_pack_not_found():
     assert response.status_code == 404
 
 
+def test_get_lead_pack_html():
+    response = client.post("/leads", json=VALID_LEAD)
+    lead_id = response.json()["lead"]["id"]
+
+    response = client.get(f"/leads/{lead_id}/pack/html")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    body = response.text
+    assert "Test User" in body
+    assert "test@example.com" in body
+    assert "medium" in body
+
+
+def test_get_lead_pack_html_not_found():
+    response = client.get("/leads/99999/pack/html")
+    assert response.status_code == 404
+
+
 def test_get_lead_delivery():
     response = client.post("/leads", json=VALID_LEAD)
     lead_id = response.json()["lead"]["id"]

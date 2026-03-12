@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import HTMLResponse
 
 from apps.api.db import get_db
 from apps.api.schemas import (
@@ -8,7 +9,7 @@ from apps.api.schemas import (
     LeadPackResponse,
     LeadResponse,
 )
-from apps.api.services.leadpack import build_summary, get_rating
+from apps.api.services.leadpack import build_summary, get_rating, render_lead_pack_html
 from apps.api.services.scoring import calculate_lead_score
 
 
@@ -72,6 +73,12 @@ def get_lead_pack(lead_id: int) -> LeadPackResponse:
         rating=rating,
         summary=summary,
     )
+
+
+@router.get("/leads/{lead_id}/pack/html", response_class=HTMLResponse)
+def get_lead_pack_html(lead_id: int) -> HTMLResponse:
+    pack = get_lead_pack(lead_id)
+    return HTMLResponse(content=render_lead_pack_html(pack))
 
 
 @router.get("/leads/{lead_id}/delivery", response_model=LeadDeliveryResponse)
