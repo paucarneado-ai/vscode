@@ -13,6 +13,7 @@ class LeadResponse(BaseModel):
     email: EmailStr
     source: str
     notes: str | None = None
+    score: int
 
 
 class LeadCreateResult(BaseModel):
