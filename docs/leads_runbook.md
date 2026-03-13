@@ -2,7 +2,7 @@
 
 **Módulo:** leads
 **Estado:** MVP operativo
-**Última actualización:** 2026-03-12
+**Última actualización:** 2026-03-13
 
 ---
 
@@ -15,7 +15,8 @@
 | `/leads/summary` | GET | Resumen: total, avg score, buckets (low/medium/high), counts por source. Mismos filtros. |
 | `/leads/export.csv` | GET | CSV con columnas: id, name, email, source, score, notes. Mismos filtros. |
 | `/leads/ingest` | POST | Ingesta batch. Body: `list[LeadCreate]`. Devuelve total/created/duplicates/errors. |
-| `/leads/webhook/{provider}` | POST | Ingesta externa. Body: name, email, notes. Source = `webhook:{provider}`. |
+| `/leads/webhook/{provider}` | POST | Ingesta externa individual. Body: name, email, notes. Source = `webhook:{provider}`. |
+| `/leads/webhook/{provider}/batch` | POST | Ingesta externa batch. Body: `list[{name, email, notes}]`. Source = `webhook:{provider}` (uniforme). Devuelve total/created/duplicates/errors. |
 | `/leads/{id}` | GET | Detalle del lead (datos persistidos, sin campos computados). |
 | `/leads/{id}/pack` | GET | Lead pack JSON: datos + rating + summary + next_action + alert. |
 | `/leads/{id}/pack/html` | GET | Lead pack HTML renderizado. |
@@ -31,7 +32,7 @@
 ## Flujo de un lead
 
 ```
-Ingesta (POST /leads, /ingest, /webhook/{provider})
+Ingesta (POST /leads, /ingest, /webhook/{provider}, /webhook/{provider}/batch)
   → Validación Pydantic (name, email, source/provider)
   → Normalización (email + source a lowercase + strip)
   → Dedup (email + source → 409 si existe)

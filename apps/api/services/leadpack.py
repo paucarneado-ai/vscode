@@ -12,7 +12,7 @@ def get_rating(score: int) -> str:
 
 
 def build_summary(name: str, source: str, score: int, rating: str) -> str:
-    return f"{name} from {source} — score {score} ({rating})"
+    return f"{name} from {source} -- score {score} ({rating})"
 
 
 def render_lead_pack_html(pack: LeadPackResponse) -> str:

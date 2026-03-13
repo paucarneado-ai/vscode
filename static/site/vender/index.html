@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sentyacht — Venta profesional de embarcaciones</title>
+    <meta name="description" content="Solicite una valoración profesional de su embarcación. Más de 50 años de experiencia en el sector náutico. Sin compromiso.">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='4' fill='%230f2b44'/><text x='16' y='23' font-size='20' font-family='Georgia,serif' fill='%23c9a84c' text-anchor='middle'>S</text></svg>">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #1a1a2e; background: #f5f6f8; }
@@ -37,6 +39,7 @@
         textarea { resize: vertical; min-height: 60px; }
         .required::after { content: " *"; color: #b91c1c; }
         .hint { font-size: 0.78rem; color: #999; margin-top: 3px; }
+        .hp-field { position: absolute; left: -9999px; opacity: 0; height: 0; width: 0; overflow: hidden; }
 
         /* Optional toggle */
         .optional-toggle { display: inline-block; font-size: 0.88rem; color: #1a3a5c; cursor: pointer; margin-top: 20px; padding-top: 16px; border-top: 1px solid #eee; width: 100%; font-weight: 500; }
@@ -45,9 +48,9 @@
         .optional-fields.visible { display: block; }
 
         /* CTA */
-        button { width: 100%; padding: 15px; background: #1a3a5c; color: #fff; border: none; border-radius: 6px; font-size: 1.05rem; font-weight: 600; cursor: pointer; margin-top: 24px; letter-spacing: 0.2px; }
-        button:hover { background: #15304d; }
-        button:disabled { background: #8a9bb5; cursor: not-allowed; }
+        button { width: 100%; padding: 15px; background: #d4b254; color: #0a1e30; border: none; border-radius: 6px; font-size: 1.05rem; font-weight: 600; cursor: pointer; margin-top: 24px; letter-spacing: 0.2px; }
+        button:hover { background: #e0c06a; }
+        button:disabled { background: #c9bf8e; color: #6b6348; cursor: not-allowed; }
         .cta-hint { font-size: 0.78rem; color: #999; text-align: center; margin-top: 8px; }
         .error-msg { display: none; color: #b91c1c; font-size: 0.88rem; margin-top: 8px; text-align: center; }
 
@@ -71,9 +74,9 @@
 </head>
 <body>
     <div class="container">
-        <p class="brand">Sentyacht</p>
+        <p class="brand"><a href="/" style="color:inherit;text-decoration:none;">Sentyacht</a></p>
         <h1>Venda su embarcación con respaldo profesional</h1>
-        <p class="sub">Vender una embarcación requiere algo más que publicarla: experiencia, red de contactos y criterio de mercado. En Sentyacht le ayudamos a hacerlo bien.</p>
+        <p class="sub">Vender una embarcación bien requiere conocer el mercado, filtrar compradores y negociar con criterio. Cuéntenos sobre la suya y le daremos una primera orientación profesional.</p>
 
         <div class="credentials">
             <p>Más de <strong>50 años de experiencia</strong> en el sector náutico, con base en el <strong>Puerto Deportivo del Masnou</strong> y una red de contactos activa en el sur de Europa.</p>
@@ -107,14 +110,26 @@
             <label class="required" for="boat_type">Tipo de embarcación</label>
             <select id="boat_type" name="boat_type" required>
                 <option value="">Seleccione...</option>
+                <option value="Yate a motor">Yate a motor</option>
+                <option value="Lancha a motor">Lancha a motor</option>
                 <option value="Velero">Velero</option>
-                <option value="Lancha">Lancha a motor</option>
-                <option value="Catamarán">Catamarán</option>
-                <option value="Otro">Otro</option>
+                <option value="Catamarán de vela">Catamarán de vela</option>
+                <option value="Catamarán a motor">Catamarán a motor</option>
+                <option value="Semirrígida / neumática">Semirrígida / neumática</option>
+                <option value="Barco de pesca / paseo-pesca">Barco de pesca / paseo-pesca</option>
+                <option value="Moto de agua">Moto de agua</option>
+                <option value="Embarcación auxiliar">Embarcación auxiliar</option>
+                <option value="Otro">Otro / no estoy seguro</option>
             </select>
 
             <label class="required" for="approximate_length">Eslora aproximada</label>
             <input type="text" id="approximate_length" name="approximate_length" required placeholder="Ej: 12m, 40 pies">
+
+            <!-- Honeypot: hidden from users, filled by bots -->
+            <div class="hp-field" aria-hidden="true">
+                <label for="website">Website</label>
+                <input type="text" id="website" name="website" tabindex="-1" autocomplete="off">
+            </div>
 
             <span class="optional-toggle" id="optional-toggle">+ Añadir más detalles sobre la embarcación (opcional)</span>
 
@@ -145,12 +160,14 @@
             <h2>Solicitud recibida</h2>
             <p>Gracias por confiar en Sentyacht.</p>
             <p class="next-step">Un especialista de nuestro equipo revisará los datos de su embarcación y le contactará por teléfono en las próximas 24–48 horas.</p>
+            <p style="margin-top:20px;"><a href="/" style="color:#1a3a5c;font-size:0.9rem;">← Volver a Sentyacht</a></p>
         </div>
     </div>
 
     <script>
-        // CONFIGURE: Set this to your API base URL
-        const API_BASE = window.OPENCLAW_API_BASE || "http://localhost:8000";
+        // API_BASE: "/api" for production (same domain, Caddy strips prefix).
+        // For local dev: set window.OPENCLAW_API_BASE = "http://localhost:8000"
+        const API_BASE = window.OPENCLAW_API_BASE || "/api";
         const WEBHOOK_PATH = "/leads/webhook/landing-barcos-venta";
 
         const form = document.getElementById("seller-form");
@@ -185,9 +202,17 @@
 
             const data = Object.fromEntries(new FormData(form));
 
+            // Honeypot check: if bot filled the hidden field, fake success silently
+            if (data.website) {
+                form.style.display = "none";
+                successMsg.style.display = "block";
+                return;
+            }
+
             if (!data.name || !data.phone || !data.email || !data.boat_type || !data.approximate_length) {
                 errorMsg.textContent = "Por favor, complete todos los campos obligatorios.";
                 errorMsg.style.display = "block";
+                errorMsg.scrollIntoView({ behavior: "smooth", block: "center" });
                 return;
             }
 
@@ -212,10 +237,12 @@
                     const err = await resp.json().catch(() => null);
                     errorMsg.textContent = (err && err.detail) || "Error al enviar. Inténtelo de nuevo.";
                     errorMsg.style.display = "block";
+                    errorMsg.scrollIntoView({ behavior: "smooth", block: "center" });
                 }
             } catch (ex) {
                 errorMsg.textContent = "Error de conexión. Compruebe su conexión e inténtelo de nuevo.";
                 errorMsg.style.display = "block";
+                errorMsg.scrollIntoView({ behavior: "smooth", block: "center" });
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.textContent = "Solicitar valoración y asesoramiento";

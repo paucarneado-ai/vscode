@@ -21,7 +21,7 @@
     color: var(--color-navy-dark);
 }
 .btn--primary:hover {
-    background: var(--color-gold-muted);
+    background: var(--color-gold-hover);
 }
 .btn--outline {
     background: transparent;
@@ -108,6 +108,20 @@
 }
 .contact-item__value a:hover {
     text-decoration: underline;
+}
+
+/* Contact items on navy background — override dark-bg defaults */
+.section--navy .contact-item__label {
+    color: rgba(255, 255, 255, 0.55);
+}
+.section--navy .contact-item__value {
+    color: var(--color-white);
+}
+.section--navy .contact-item__value a {
+    color: var(--color-gold);
+}
+.section--navy .contact-item__value a:hover {
+    color: var(--color-white);
 }
 
 /* Definition list — for future boat specs */

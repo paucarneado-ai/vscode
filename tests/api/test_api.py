@@ -1164,6 +1164,66 @@ def test_webhook_empty_provider_rejected():
     assert resp.status_code == 422
 
 
+# --- Webhook batch ---
+
+
+def test_webhook_batch_happy_path():
+    """Batch creates leads with auto-generated source."""
+    resp = client.post("/leads/webhook/batch-test/batch", json=[
+        {"name": "Batch A", "email": "batcha@wb.com", "notes": "first"},
+        {"name": "Batch B", "email": "batchb@wb.com", "notes": "second"},
+    ])
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 2
+    assert data["created"] == 2
+    assert data["duplicates"] == 0
+    assert data["errors"] == []
+    leads = client.get("/leads", params={"source": "webhook:batch-test"}).json()
+    assert len(leads) >= 2
+
+
+def test_webhook_batch_duplicates_counted():
+    client.post("/leads/webhook/batch-dup/batch", json=[
+        {"name": "Dup Lead", "email": "dupbatch@wb.com"},
+    ])
+    resp = client.post("/leads/webhook/batch-dup/batch", json=[
+        {"name": "Dup Lead", "email": "dupbatch@wb.com"},
+        {"name": "New Lead", "email": "newbatch@wb.com"},
+    ])
+    data = resp.json()
+    assert data["total"] == 2
+    assert data["created"] == 1
+    assert data["duplicates"] == 1
+
+
+def test_webhook_batch_empty_provider_rejected():
+    resp = client.post("/leads/webhook/%20%20/batch", json=[
+        {"name": "Bad", "email": "bad@wb.com"},
+    ])
+    assert resp.status_code == 422
+
+
+def test_webhook_batch_structure_and_arithmetic():
+    """Response shape matches /leads/ingest and arithmetic holds."""
+    resp = client.post("/leads/webhook/batch-arith/batch", json=[
+        {"name": "Arith A", "email": "aritha@wb.com"},
+        {"name": "Arith A", "email": "aritha@wb.com"},
+        {"name": "Arith B", "email": "arithb@wb.com"},
+    ])
+    data = resp.json()
+    assert set(data.keys()) == {"total", "created", "duplicates", "errors"}
+    assert data["total"] == data["created"] + data["duplicates"] + len(data["errors"])
+
+
+def test_webhook_batch_does_not_break_single_webhook():
+    resp = client.post("/leads/webhook/batch-compat", json={
+        "name": "Compat", "email": "compat@wb.com",
+    })
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "accepted"
+
+
 def test_source_dedup_consistent_after_normalization():
     """Same source with different casing/whitespace should dedup correctly."""
     client.post("/leads", json={
@@ -1178,7 +1238,7 @@ def test_source_dedup_consistent_after_normalization():
 # --- Operational contract ---
 
 
-OPERATIONAL_FIELDS = {"lead_id", "source", "score", "rating", "next_action", "instruction", "alert", "summary", "generated_at"}
+OPERATIONAL_FIELDS = {"lead_id", "name", "source", "score", "rating", "next_action", "instruction", "alert", "summary", "created_at", "generated_at"}
 
 
 def test_operational_response_structure():
@@ -1239,10 +1299,10 @@ def test_operational_no_extra_fields():
     })
     lead_id = resp.json()["lead"]["id"]
     op = client.get(f"/leads/{lead_id}/operational").json()
-    assert "name" not in op
+    assert "name" in op
+    assert "created_at" in op
     assert "email" not in op
     assert "notes" not in op
-    assert "created_at" not in op
     assert "message" not in op
     assert "pack" not in op
 

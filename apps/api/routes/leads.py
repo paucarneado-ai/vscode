@@ -121,6 +121,38 @@ def webhook_ingest(provider: str, payload: WebhookLeadPayload) -> dict:
     return {"status": "accepted", "lead_id": result.lead.id}
 
 
+@router.post("/leads/webhook/{provider}/batch")
+def webhook_ingest_batch(provider: str, items: list[WebhookLeadPayload]) -> dict:
+    provider_clean = provider.strip().lower()
+    if not provider_clean:
+        raise HTTPException(status_code=422, detail="provider cannot be empty or whitespace-only")
+    source = f"webhook:{provider_clean}"
+
+    created = 0
+    duplicates = 0
+    errors: list[dict] = []
+
+    for i, item in enumerate(items):
+        try:
+            lead_create = LeadCreate(
+                name=item.name, email=item.email, source=source, notes=item.notes
+            )
+            _, status = _create_lead_internal(lead_create)
+            if status == 200:
+                created += 1
+            elif status == 409:
+                duplicates += 1
+        except Exception as exc:
+            errors.append({"index": i, "email": item.email, "error": str(exc)})
+
+    return {
+        "total": len(items),
+        "created": created,
+        "duplicates": duplicates,
+        "errors": errors,
+    }
+
+
 def _build_where_clause(
     source: str | None = None,
     min_score: int | None = None,
@@ -251,6 +283,7 @@ def _get_actionable_leads(
         next_action = determine_next_action(lead["score"], lead["notes"])
         results.append(LeadOperationalSummary(
             lead_id=lead["id"],
+            name=lead["name"],
             source=lead["source"],
             score=lead["score"],
             rating=rating,
@@ -258,6 +291,7 @@ def _get_actionable_leads(
             instruction=get_instruction(next_action),
             alert=should_alert(lead["score"]),
             summary=build_summary(lead["name"], lead["source"], lead["score"], rating),
+            created_at=lead["created_at"],
             generated_at=now,
         ))
     return results
@@ -378,6 +412,7 @@ def get_lead_operational(lead_id: int) -> LeadOperationalSummary:
     pack = get_lead_pack(lead_id)
     return LeadOperationalSummary(
         lead_id=pack.lead_id,
+        name=pack.name,
         source=pack.source,
         score=pack.score,
         rating=pack.rating,
@@ -385,6 +420,7 @@ def get_lead_operational(lead_id: int) -> LeadOperationalSummary:
         instruction=get_instruction(pack.next_action),
         alert=pack.alert,
         summary=pack.summary,
+        created_at=pack.created_at,
         generated_at=datetime.now(timezone.utc).isoformat(),
     )
 

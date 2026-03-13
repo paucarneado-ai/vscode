@@ -46,6 +46,7 @@ class WebhookLeadPayload(BaseModel):
 
 class LeadOperationalSummary(BaseModel):
     lead_id: int
+    name: str
     source: str
     score: int
     rating: str
@@ -53,6 +54,7 @@ class LeadOperationalSummary(BaseModel):
     instruction: str
     alert: bool
     summary: str
+    created_at: str
     generated_at: str
 
 
