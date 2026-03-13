@@ -30,6 +30,8 @@ def render_lead_pack_html(pack: LeadPackResponse) -> str:
         f"<p><strong>Score:</strong> {pack.score}</p>"
         f"<p><strong>Rating:</strong> {e(pack.rating)}</p>"
         f"<p><strong>Summary:</strong> {e(pack.summary)}</p>"
+        f"<p><strong>Next action:</strong> {e(pack.next_action)}</p>"
+        f"<p><strong>Alert:</strong> {'YES' if pack.alert else 'no'}</p>"
         f"<p><strong>Created at:</strong> {e(pack.created_at)}</p>"
         "</body></html>"
     )
@@ -46,5 +48,7 @@ def render_lead_pack_text(pack: LeadPackResponse) -> str:
         f"Score: {pack.score}\n"
         f"Rating: {pack.rating}\n"
         f"Summary: {pack.summary}\n"
+        f"Next action: {pack.next_action}\n"
+        f"Alert: {'YES' if pack.alert else 'no'}\n"
         f"Created at: {pack.created_at}\n"
     )

@@ -1,16 +1,23 @@
 import csv
 import io
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 
 from apps.api.db import get_db
+from collections import defaultdict
+
 from apps.api.schemas import (
     LeadCreate,
     LeadCreateResult,
     LeadDeliveryResponse,
+    LeadOperationalSummary,
     LeadPackResponse,
     LeadResponse,
+    WebhookLeadPayload,
+    WorklistGroup,
+    WorklistResponse,
 )
 from apps.api.services.leadpack import (
     build_summary,
@@ -18,6 +25,7 @@ from apps.api.services.leadpack import (
     render_lead_pack_html,
     render_lead_pack_text,
 )
+from apps.api.services.actions import determine_next_action, get_instruction, should_alert
 from apps.api.services.scoring import calculate_lead_score
 
 
@@ -27,6 +35,8 @@ router = APIRouter()
 def _create_lead_internal(payload: LeadCreate) -> tuple[LeadCreateResult, int]:
     """Create a lead and return (result, http_status)."""
     source = payload.source.strip().lower()
+    if not source:
+        raise HTTPException(status_code=422, detail="source cannot be empty or whitespace-only")
     email = payload.email.strip().lower()
 
     db = get_db()
@@ -91,6 +101,24 @@ def ingest_leads(items: list[LeadCreate]) -> dict:
         "duplicates": duplicates,
         "errors": errors,
     }
+
+
+@router.post("/leads/webhook/{provider}")
+def webhook_ingest(provider: str, payload: WebhookLeadPayload) -> dict:
+    provider_clean = provider.strip().lower()
+    if not provider_clean:
+        raise HTTPException(status_code=422, detail="provider cannot be empty or whitespace-only")
+    source = f"webhook:{provider_clean}"
+    lead_create = LeadCreate(
+        name=payload.name, email=payload.email, source=source, notes=payload.notes
+    )
+    result, status = _create_lead_internal(lead_create)
+    if status == 409:
+        return JSONResponse(
+            status_code=409,
+            content={"status": "duplicate", "lead_id": result.lead.id},
+        )
+    return {"status": "accepted", "lead_id": result.lead.id}
 
 
 def _build_where_clause(
@@ -196,6 +224,79 @@ def get_leads_summary(
     }
 
 
+def _get_actionable_leads(
+    source: str | None = None,
+    limit: int | None = None,
+) -> list[LeadOperationalSummary]:
+    """Return actionable leads as LeadOperationalSummary list."""
+    db = get_db()
+    conditions: list[str] = [
+        "(score >= 40 OR (notes IS NOT NULL AND TRIM(notes) != ''))"
+    ]
+    params: list[str | int] = []
+    if source is not None:
+        conditions.append("source = ?")
+        params.append(source)
+    where = " WHERE " + " AND ".join(conditions)
+    query = f"SELECT * FROM leads{where} ORDER BY score DESC"
+    if limit is not None:
+        query += " LIMIT ?"
+        params.append(limit)
+    rows = db.execute(query, params).fetchall()
+    now = datetime.now(timezone.utc).isoformat()
+    results = []
+    for row in rows:
+        lead = dict(row)
+        rating = get_rating(lead["score"])
+        next_action = determine_next_action(lead["score"], lead["notes"])
+        results.append(LeadOperationalSummary(
+            lead_id=lead["id"],
+            source=lead["source"],
+            score=lead["score"],
+            rating=rating,
+            next_action=next_action,
+            instruction=get_instruction(next_action),
+            alert=should_alert(lead["score"]),
+            summary=build_summary(lead["name"], lead["source"], lead["score"], rating),
+            generated_at=now,
+        ))
+    return results
+
+
+@router.get("/leads/actionable", response_model=list[LeadOperationalSummary])
+def get_actionable_leads(
+    source: str | None = None,
+    limit: int | None = Query(default=None, ge=1),
+) -> list[LeadOperationalSummary]:
+    return _get_actionable_leads(source, limit)
+
+
+ACTION_PRIORITY = ["send_to_client", "review_manually", "request_more_info", "enrich_first"]
+
+
+@router.get("/leads/actionable/worklist", response_model=WorklistResponse)
+def get_actionable_worklist(
+    source: str | None = None,
+    limit: int | None = Query(default=None, ge=1),
+) -> WorklistResponse:
+    leads = _get_actionable_leads(source, limit)
+    grouped: dict[str, list[LeadOperationalSummary]] = defaultdict(list)
+    for lead in leads:
+        grouped[lead.next_action].append(lead)
+    priority_set = set(ACTION_PRIORITY)
+    ordered_actions = [a for a in ACTION_PRIORITY if a in grouped]
+    ordered_actions += [a for a in grouped if a not in priority_set]
+    groups = [
+        WorklistGroup(next_action=action, count=len(grouped[action]), leads=grouped[action])
+        for action in ordered_actions
+    ]
+    return WorklistResponse(
+        generated_at=datetime.now(timezone.utc).isoformat(),
+        total=len(leads),
+        groups=groups,
+    )
+
+
 CSV_COLUMNS = ["id", "name", "email", "source", "score", "notes"]
 
 
@@ -243,6 +344,8 @@ def get_lead_pack(lead_id: int) -> LeadPackResponse:
     lead = dict(row)
     rating = get_rating(lead["score"])
     summary = build_summary(lead["name"], lead["source"], lead["score"], rating)
+    next_action = determine_next_action(lead["score"], lead["notes"])
+    alert = should_alert(lead["score"])
     return LeadPackResponse(
         lead_id=lead["id"],
         created_at=lead["created_at"],
@@ -253,6 +356,8 @@ def get_lead_pack(lead_id: int) -> LeadPackResponse:
         score=lead["score"],
         rating=rating,
         summary=summary,
+        next_action=next_action,
+        alert=alert,
     )
 
 
@@ -268,14 +373,37 @@ def get_lead_pack_text(lead_id: int) -> PlainTextResponse:
     return PlainTextResponse(content=render_lead_pack_text(pack))
 
 
+@router.get("/leads/{lead_id}/operational", response_model=LeadOperationalSummary)
+def get_lead_operational(lead_id: int) -> LeadOperationalSummary:
+    pack = get_lead_pack(lead_id)
+    return LeadOperationalSummary(
+        lead_id=pack.lead_id,
+        source=pack.source,
+        score=pack.score,
+        rating=pack.rating,
+        next_action=pack.next_action,
+        instruction=get_instruction(pack.next_action),
+        alert=pack.alert,
+        summary=pack.summary,
+        generated_at=datetime.now(timezone.utc).isoformat(),
+    )
+
+
 @router.get("/leads/{lead_id}/delivery", response_model=LeadDeliveryResponse)
 def get_lead_delivery(lead_id: int) -> LeadDeliveryResponse:
     pack = get_lead_pack(lead_id)
+    generated_at = datetime.now(timezone.utc).isoformat()
+    if pack.alert:
+        message = f"ALERT: lead requires attention — {pack.next_action}"
+    else:
+        message = f"Lead pack generated — next: {pack.next_action}"
     return LeadDeliveryResponse(
         lead_id=pack.lead_id,
         delivery_status="generated",
         channel="api",
-        generated_at=pack.created_at,
+        generated_at=generated_at,
+        next_action=pack.next_action,
+        alert=pack.alert,
         pack=pack,
-        message="Lead pack generated and ready for delivery",
+        message=message,
     )
