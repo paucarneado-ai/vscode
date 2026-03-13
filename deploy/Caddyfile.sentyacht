@@ -1,0 +1,20 @@
+# Sentyacht — Caddyfile
+# Usage: copy to /etc/caddy/Caddyfile, then: systemctl reload caddy
+#
+# For staging (before DNS): replace sentyacht.com with :80
+# or use the VPS IP directly. Caddy will skip HTTPS for bare IPs.
+
+sentyacht.com {
+    # API — reverse proxy to uvicorn (strip /api prefix)
+    handle /api/* {
+        uri strip_prefix /api
+        reverse_proxy localhost:8000
+    }
+
+    # Static files — single root serves / and /vender/ automatically
+    handle {
+        file_server {
+            root /home/sentyacht/site
+        }
+    }
+}
