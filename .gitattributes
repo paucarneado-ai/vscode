@@ -1,0 +1,11 @@
+# Force LF line endings for files that run on Linux
+*.sh text eol=lf
+*.service text eol=lf
+Caddyfile* text eol=lf
+.env.example text eol=lf
+
+# Python
+*.py text eol=lf
+
+# Keep default auto-detection for everything else
+* text=auto

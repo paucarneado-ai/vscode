@@ -1,0 +1,132 @@
+from typing import Any
+
+from pydantic import BaseModel, EmailStr, Field
+
+
+class LeadCreate(BaseModel):
+    name: str = Field(min_length=1)
+    email: EmailStr
+    source: str = Field(min_length=1)
+    notes: str | None = None
+
+
+class LeadResponse(BaseModel):
+    id: int
+    name: str
+    email: EmailStr
+    source: str
+    notes: str | None = None
+    score: int
+    created_at: str
+
+
+class LeadCreateResult(BaseModel):
+    message: str
+    lead: LeadResponse
+    meta: dict[str, str]
+
+
+class LeadPackResponse(BaseModel):
+    lead_id: int
+    created_at: str
+    name: str
+    email: EmailStr
+    source: str
+    notes: str | None = None
+    score: int
+    rating: str
+    summary: str
+    next_action: str
+    alert: bool
+
+
+class WebhookLeadPayload(BaseModel):
+    name: str = Field(min_length=1)
+    email: EmailStr
+    notes: str | None = None
+
+
+class LeadOperationalSummary(BaseModel):
+    lead_id: int
+    name: str
+    source: str
+    score: int
+    rating: str
+    next_action: str
+    instruction: str
+    alert: bool
+    summary: str
+    created_at: str
+    generated_at: str
+
+
+class WorklistGroup(BaseModel):
+    next_action: str
+    count: int
+    leads: list[LeadOperationalSummary]
+
+
+class WorklistResponse(BaseModel):
+    generated_at: str
+    total: int
+    groups: list[WorklistGroup]
+
+
+class QueueResponse(BaseModel):
+    generated_at: str
+    total: int
+    urgent_count: int
+    items: list[LeadOperationalSummary]
+
+
+class LeadDeliveryResponse(BaseModel):
+    lead_id: int
+    delivery_status: str
+    channel: str
+    generated_at: str
+    next_action: str
+    alert: bool
+    pack: LeadPackResponse
+    message: str
+
+
+class ExternalLeadPayload(BaseModel):
+    name: str = Field(min_length=1)
+    email: EmailStr
+    source: str = Field(min_length=1)
+    phone: str | None = None
+    notes: str | None = None
+    metadata: dict[str, Any] | None = None
+
+
+class ExternalLeadResult(BaseModel):
+    status: str
+    lead_id: int
+    score: int
+    message: str
+
+
+class AutomationDispatch(BaseModel):
+    lead_id: int
+    action: str
+    instruction: str
+    priority: int
+    alert: bool
+    payload: LeadPackResponse
+    generated_at: str
+
+
+class AutomationBatchResponse(BaseModel):
+    generated_at: str
+    total: int
+    items: list[AutomationDispatch]
+
+
+class ClaimRequest(BaseModel):
+    lead_ids: list[int] = Field(min_length=1)
+
+
+class ClaimResponse(BaseModel):
+    claimed: list[int]
+    already_claimed: list[int]
+    not_found: list[int]
