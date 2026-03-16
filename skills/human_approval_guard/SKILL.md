@@ -1,4 +1,9 @@
-# Human Approval Guard
+# Human Approval Guard — ARCHIVED
+
+> **Status: archived (2026-03-16)**
+> Superseded by `.claude/CLAUDE.md` §10 (approval boundaries) + `apps/api/CLAUDE.md` REVIEW FLOW (risk classes + stop rules).
+> All 6 approval categories below are fully covered by those governance layers.
+> Retained for reference only. Do not treat as active governance.
 
 ## Propósito
 Bloquear cambios críticos hasta recibir aprobación explícita del usuario.

@@ -41,6 +41,33 @@ def init_db() -> None:
         )
         """
     )
+    db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_type TEXT NOT NULL,
+            entity_type TEXT NOT NULL,
+            entity_id INTEGER NOT NULL,
+            origin_module TEXT NOT NULL,
+            payload TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+        """
+    )
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_events_event_type ON events (event_type)"
+    )
+    db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS lead_outcomes (
+            lead_id INTEGER PRIMARY KEY REFERENCES leads(id),
+            outcome TEXT NOT NULL,
+            reason TEXT,
+            notes TEXT,
+            recorded_at TEXT NOT NULL
+        )
+        """
+    )
     db.commit()
 
 

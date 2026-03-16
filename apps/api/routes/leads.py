@@ -18,6 +18,7 @@ from apps.api.schemas import (
     LeadCreate,
     LeadCreateResult,
     LeadDeliveryResponse,
+    LeadsSummaryResponse,
     LeadOperationalSummary,
     LeadPackResponse,
     LeadResponse,
@@ -33,6 +34,7 @@ from apps.api.services.leadpack import (
 )
 from apps.api.services.actions import ACTION_PRIORITY, determine_next_action, get_instruction, should_alert
 from apps.api.services.scoring import calculate_lead_score
+from apps.api.events import emit_event
 
 
 router = APIRouter()
@@ -101,6 +103,11 @@ def _create_lead_internal(payload: LeadCreate) -> tuple[LeadCreateResult, int]:
 
     row = db.execute("SELECT * FROM leads WHERE id = ?", (cursor.lastrowid,)).fetchone()
     lead = LeadResponse(**dict(row))
+
+    emit_event(
+        "lead.created", "lead", lead.id, "leads",
+        {"source": lead.source, "score": lead.score},
+    )
 
     result = LeadCreateResult(
         message="lead received",
@@ -330,14 +337,14 @@ def list_sources() -> list[str]:
     return [row["source"] for row in rows]
 
 
-@router.get("/leads/summary")
+@router.get("/leads/summary", response_model=LeadsSummaryResponse)
 def get_leads_summary(
     source: str | None = None,
     min_score: int | None = Query(default=None, ge=0),
     q: str | None = None,
     created_from: str | None = None,
     created_to: str | None = None,
-) -> dict:
+) -> LeadsSummaryResponse:
     db = get_db()
     where, params = _build_where_clause(source, min_score, q, created_from, created_to)
 
@@ -366,14 +373,14 @@ def get_leads_summary(
     ).fetchall()
     counts_by_source = {r["source"]: r["cnt"] for r in source_rows}
 
-    return {
-        "total_leads": total_leads,
-        "average_score": average_score,
-        "low_score_count": low_score_count,
-        "medium_score_count": medium_score_count,
-        "high_score_count": high_score_count,
-        "counts_by_source": counts_by_source,
-    }
+    return LeadsSummaryResponse(
+        total_leads=total_leads,
+        average_score=average_score,
+        low_score_count=low_score_count,
+        medium_score_count=medium_score_count,
+        high_score_count=high_score_count,
+        counts_by_source=counts_by_source,
+    )
 
 
 def _get_actionable_leads(

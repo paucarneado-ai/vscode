@@ -122,6 +122,41 @@ For external integrations, prefer the thinnest usable contract first.
 
 ---
 
+## Non-monetizing block survival rule
+
+Do not keep or build a block only because it sounds foundational.
+
+A block that does not monetize directly or clearly within 30–60 days is rejected by default.
+
+It may still be accepted only if it clearly satisfies at least one of these:
+- creates reusable infrastructure
+- prevents likely rework
+- reduces meaningful risk
+- enables a clearly plausible future capability or vertical
+- materially improves system cohesion, reliability, or maintainability
+
+And only if all of these are also true:
+- scope is small and controlled
+- it does not displace better commercial, validation, or automation work without strong reason
+- it does not add disproportionate complexity
+- its value can be explained concretely, not abstractly
+- there is a plausible way to verify later that it actually paid off
+
+Required before approval:
+- state exactly which exception condition it satisfies
+- state what concrete future value it enables or what concrete risk/rework it avoids
+- state why doing it now is better than doing it later
+- state what later signal would show that keeping it was correct
+
+If a non-monetizing block does not meet that standard:
+- reject it, or
+- archive it as an idea,
+but do not build it now.
+
+"Foundational" alone is not a justification.
+
+---
+
 ## 7. Lessons and documentation
 
 `tasks/lessons.md` stores repeated mistakes and corrective patterns.

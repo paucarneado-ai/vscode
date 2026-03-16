@@ -1,25 +1,37 @@
 # Regression Sentinel
 
-## Propósito
-Comprobar que lo que ya funciona no se rompe después de un cambio.
+## Mission
+Given a code change, identify what might break and what to rerun.
 
-## Cuándo usarla
-- Después de modificar código existente.
-- Antes de dar por terminado un task que tocó funcionalidad ya implementada.
-- Cuando un cambio afecta módulos compartidos o dependencias internas.
+## When to use
+After any edit to route, schema, service, or shared logic.
+Before declaring a block verified.
 
-## Reglas de comportamiento
-1. Antes de declarar un cambio completo, ejecutar los tests existentes relacionados.
-2. Si no hay tests para el área afectada, advertir al usuario y proponer tests mínimos.
-3. Verificar que los endpoints existentes siguen respondiendo con el mismo formato y status codes.
-4. Si un test falla tras el cambio, no modificar el test para que pase. Investigar si el cambio introdujo un bug.
-5. Comparar el comportamiento antes y después del cambio en los paths críticos.
-6. Si el cambio toca scoring, leadpack o auth, aplicar verificación extra y escalar a revisión humana.
+## Procedure
+1. List the files changed in this block.
+2. For each changed file, identify:
+   - which endpoints call this code (direct or indirect)
+   - which tests exercise those endpoints
+   - which schemas are used in those endpoints
+3. Map the blast radius:
+   - **direct**: tests that import or call the changed code
+   - **indirect**: tests for endpoints that use shared logic touched by the change
+4. Run direct tests first. If any fail, stop and investigate.
+5. Run indirect tests. If any fail, determine whether the change caused it.
+6. If a test fails, do not modify the test to make it pass. Investigate whether the change introduced a regression.
 
-## Salida esperada
-Después de ejecutar la verificación:
+## Required output
+- **Files changed**: list
+- **Blast radius**: direct and indirect test targets, named specifically
+- **Tests run**: which, pass/fail
+- **Regressions found**: description or "none"
+- **Action**: continue / investigate / stop and report to operator
+- **Coverage gap**: yes/no
 
-- **Tests ejecutados**: cuáles y resultado (pass/fail)
-- **Endpoints verificados**: status y formato de respuesta
-- **Regresiones detectadas**: descripción del problema, o "ninguna"
-- **Acción recomendada**: continuar / investigar / escalar
+## Rules
+- "All 283 tests pass" is not a blast radius analysis. Name the specific tests that matter.
+- If no tests cover the changed behavior, say so explicitly.
+- Do not skip indirect tests because direct tests passed.
+
+## Non-goals
+Not for designing new tests. Not for deciding what to build.

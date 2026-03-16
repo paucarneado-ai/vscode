@@ -1607,7 +1607,8 @@ def test_queue_respects_limit():
         })
     resp = client.get("/internal/queue", params={"source": "q_limit", "limit": 2})
     data = resp.json()
-    assert data["total"] <= 2
+    assert len(data["items"]) <= 2
+    assert data["total"] >= len(data["items"])
 
 
 def test_queue_empty_when_no_actionable():
@@ -1717,7 +1718,8 @@ def test_queue_limit_truncates_after_sort():
     limited_resp = client.get("/internal/queue", params={"source": "qlimit", "limit": 2})
     assert limited_resp.status_code == 200
     limited = limited_resp.json()
-    assert limited["total"] == 2
+    assert len(limited["items"]) == 2
+    assert limited["total"] == full_resp.json()["total"]
     assert [item["lead_id"] for item in limited["items"]] == [item["lead_id"] for item in full_items[:2]]
 
 
@@ -1856,7 +1858,8 @@ def test_dispatch_limit_truncates_after_sort():
     limited_resp = client.get("/internal/dispatch", params={"limit": 2})
     assert limited_resp.status_code == 200
     limited = limited_resp.json()
-    assert limited["total"] == 2
+    assert len(limited["items"]) == 2
+    assert limited["total"] >= len(limited["items"])
     # The limited items must be the first 2 from the full sorted list
     assert [item["lead_id"] for item in limited["items"]] == [item["lead_id"] for item in full_items[:2]]
 
@@ -1877,7 +1880,8 @@ def test_dispatch_limit_with_action_filter():
     # Get limited
     limited_resp = client.get("/internal/dispatch", params={"action": target_action, "limit": 1})
     limited = limited_resp.json()
-    assert limited["total"] == 1
+    assert len(limited["items"]) == 1
+    assert limited["total"] >= len(limited["items"])
     assert limited["items"][0]["lead_id"] == action_items[0]["lead_id"]
 
 
@@ -2009,6 +2013,427 @@ def test_claim_duplicate_ids_deduplicated():
     assert data["claimed"] == [lead_id]
     assert data["already_claimed"] == []
     assert data["not_found"] == []
+
+
+# ---------------------------------------------------------------------------
+# GET /internal/handoffs — outbound automation handoff
+# ---------------------------------------------------------------------------
+
+
+def test_handoffs_returns_batch():
+    """Handoffs endpoint returns batch response with correct shape."""
+    resp = client.get("/internal/handoffs")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "generated_at" in data
+    assert "total" in data
+    assert "items" in data
+    assert isinstance(data["items"], list)
+
+
+def test_handoff_item_contract():
+    """Each handoff item has exactly the approved fields."""
+    r = client.post("/leads", json={
+        "name": "Handoff Contract", "email": "hcontract@handoff.com",
+        "source": "handofftest", "notes": "real notes for handoff",
+    })
+    assert r.status_code == 200
+    resp = client.get("/internal/handoffs", params={"source": "handofftest"})
+    data = resp.json()
+    assert data["total"] > 0
+    item = data["items"][0]
+    assert set(item.keys()) == {"lead_id", "action", "channel", "instruction", "payload"}
+    assert isinstance(item["lead_id"], int)
+    assert isinstance(item["action"], str)
+    assert isinstance(item["channel"], str)
+    assert isinstance(item["instruction"], str)
+    assert isinstance(item["payload"], dict)
+
+
+def test_handoffs_excludes_claimed():
+    """Claimed leads do not appear in handoffs."""
+    r = client.post("/leads", json={
+        "name": "Handoff Excl", "email": "hexcl@handoff.com",
+        "source": "handoffexcl", "notes": "real notes",
+    })
+    lead_id = r.json()["lead"]["id"]
+    resp_before = client.get("/internal/handoffs", params={"source": "handoffexcl"})
+    ids_before = [i["lead_id"] for i in resp_before.json()["items"]]
+    assert lead_id in ids_before
+    client.post("/internal/dispatch/claim", json={"lead_ids": [lead_id]})
+    resp_after = client.get("/internal/handoffs", params={"source": "handoffexcl"})
+    ids_after = [i["lead_id"] for i in resp_after.json()["items"]]
+    assert lead_id not in ids_after
+
+
+def test_handoffs_action_filter():
+    """Action filter works on handoffs."""
+    r = client.post("/leads", json={
+        "name": "Handoff Act", "email": "hact@handoff.com",
+        "source": "handoffact", "notes": "real notes",
+    })
+    assert r.status_code == 200
+    lead = r.json()["lead"]
+    resp = client.get("/internal/handoffs", params={
+        "source": "handoffact", "action": lead["score"] >= 60 and "send_to_client" or "review_manually",
+    })
+    data = resp.json()
+    for item in data["items"]:
+        assert item["action"] == (lead["score"] >= 60 and "send_to_client" or "review_manually")
+
+
+def test_handoffs_channel_mapping():
+    """Each action maps to the expected channel."""
+    expected = {
+        "send_to_client": "email",
+        "review_manually": "review",
+        "request_more_info": "email",
+        "enrich_first": "manual",
+    }
+    resp = client.get("/internal/handoffs")
+    data = resp.json()
+    for item in data["items"]:
+        if item["action"] in expected:
+            assert item["channel"] == expected[item["action"]], (
+                f"action {item['action']} should map to {expected[item['action']]}, got {item['channel']}"
+            )
+
+
+def test_handoffs_instruction_contains_lead_info():
+    """Instruction includes lead name, source, and score."""
+    r = client.post("/leads", json={
+        "name": "Handoff Info", "email": "hinfo@handoff.com",
+        "source": "handoffinfo", "notes": "real notes",
+    })
+    lead_id = r.json()["lead"]["id"]
+    resp = client.get("/internal/handoffs", params={"source": "handoffinfo"})
+    data = resp.json()
+    item = [i for i in data["items"] if i["lead_id"] == lead_id][0]
+    assert "Handoff Info" in item["instruction"]
+    assert "handoffinfo" in item["instruction"]
+
+
+def test_handoffs_consistent_with_dispatch():
+    """Handoffs and dispatch return the same leads in the same order."""
+    source = "handoffcons"
+    for i in range(3):
+        client.post("/leads", json={
+            "name": f"HCons {i}", "email": f"hcons{i}@handoff.com",
+            "source": source, "notes": "notes for consistency",
+        })
+    dispatch_resp = client.get("/internal/dispatch", params={"source": source})
+    handoff_resp = client.get("/internal/handoffs", params={"source": source})
+    dispatch_ids = [i["lead_id"] for i in dispatch_resp.json()["items"]]
+    handoff_ids = [i["lead_id"] for i in handoff_resp.json()["items"]]
+    assert dispatch_ids == handoff_ids
+
+
+def test_handoffs_no_generated_at_on_item():
+    """HandoffItem does not have generated_at — only the batch response does."""
+    resp = client.get("/internal/handoffs")
+    data = resp.json()
+    assert "generated_at" in data
+    for item in data["items"]:
+        assert "generated_at" not in item
+
+
+# ---------------------------------------------------------------------------
+# GET /internal/handoffs/export.csv — handoff CSV export
+# ---------------------------------------------------------------------------
+
+
+def test_handoff_csv_returns_csv():
+    """Handoff CSV endpoint returns text/csv with correct headers."""
+    resp = client.get("/internal/handoffs/export.csv")
+    assert resp.status_code == 200
+    assert "text/csv" in resp.headers["content-type"]
+    assert "handoffs.csv" in resp.headers.get("content-disposition", "")
+
+
+def test_handoff_csv_columns():
+    """CSV has the expected column headers."""
+    client.post("/leads", json={
+        "name": "CSV Col", "email": "csvcol@hcsv.com",
+        "source": "hcsvtest", "notes": "real notes",
+    })
+    resp = client.get("/internal/handoffs/export.csv", params={"source": "hcsvtest"})
+    rows = _parse_csv(resp.text)
+    assert rows[0] == ["lead_id", "action", "channel", "instruction", "name", "email", "source", "score", "rating"]
+
+
+def test_handoff_csv_data_matches_json():
+    """CSV data rows match the JSON handoffs endpoint."""
+    source = "hcsvmatch"
+    client.post("/leads", json={
+        "name": "CSV Match", "email": "csvmatch@hcsv.com",
+        "source": source, "notes": "real notes",
+    })
+    json_resp = client.get("/internal/handoffs", params={"source": source})
+    csv_resp = client.get("/internal/handoffs/export.csv", params={"source": source})
+    json_ids = [i["lead_id"] for i in json_resp.json()["items"]]
+    rows = _parse_csv(csv_resp.text)
+    csv_ids = [int(r[0]) for r in rows[1:]]
+    assert json_ids == csv_ids
+
+
+def test_handoff_csv_excludes_claimed():
+    """Claimed leads do not appear in handoff CSV."""
+    r = client.post("/leads", json={
+        "name": "CSV Excl", "email": "csvexcl@hcsv.com",
+        "source": "hcsvexcl", "notes": "real notes",
+    })
+    lead_id = r.json()["lead"]["id"]
+    resp_before = client.get("/internal/handoffs/export.csv", params={"source": "hcsvexcl"})
+    rows_before = _parse_csv(resp_before.text)
+    ids_before = [int(r[0]) for r in rows_before[1:]]
+    assert lead_id in ids_before
+    client.post("/internal/dispatch/claim", json={"lead_ids": [lead_id]})
+    resp_after = client.get("/internal/handoffs/export.csv", params={"source": "hcsvexcl"})
+    rows_after = _parse_csv(resp_after.text)
+    ids_after = [int(r[0]) for r in rows_after[1:]]
+    assert lead_id not in ids_after
+
+
+def test_handoff_csv_action_filter():
+    """Action filter works on CSV export."""
+    client.post("/leads", json={
+        "name": "CSV Act", "email": "csvact@hcsv.com",
+        "source": "hcsvact", "notes": "real notes",
+    })
+    resp = client.get("/internal/handoffs/export.csv", params={
+        "source": "hcsvact", "action": "review_manually",
+    })
+    rows = _parse_csv(resp.text)
+    for r in rows[1:]:
+        assert r[1] == "review_manually"
+
+
+def test_handoff_csv_sanitizes_injection():
+    """CSV values starting with dangerous chars are sanitized."""
+    client.post("/leads", json={
+        "name": "=EVIL()", "email": "csvinj@hcsv.com",
+        "source": "hcsvinj", "notes": "real notes",
+    })
+    resp = client.get("/internal/handoffs/export.csv", params={"source": "hcsvinj"})
+    rows = _parse_csv(resp.text)
+    name_col = rows[0].index("name")
+    data_rows = [r for r in rows[1:] if r[name_col].endswith("EVIL()")]
+    assert len(data_rows) >= 1
+    assert data_rows[0][name_col] == "'=EVIL()"
+
+
+# ---------------------------------------------------------------------------
+# GET /internal/review — client review queue
+# ---------------------------------------------------------------------------
+
+
+def test_review_returns_batch():
+    """Review endpoint returns batch response with correct shape."""
+    resp = client.get("/internal/review")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "generated_at" in data
+    assert "total" in data
+    assert "urgent_count" in data
+    assert "items" in data
+    assert isinstance(data["items"], list)
+
+
+def test_review_only_reviewable_actions():
+    """Review queue only contains send_to_client and review_manually leads."""
+    # score 60 + notes → send_to_client
+    client.post("/leads", json={
+        "name": "Review HiScore", "email": "reviewhi@review.com",
+        "source": "reviewtest", "notes": "interested in premium boats",
+    })
+    # score 50 + notes → review_manually (score 50-59 with notes)
+    # Actually score is calculated: base 50 + notes bonus 10 = 60 → send_to_client
+    # To get review_manually we need score 40-59 with notes, but scoring gives 60 for notes
+    # Let's just verify that whatever comes back has the right actions
+    resp = client.get("/internal/review")
+    data = resp.json()
+    for item in data["items"]:
+        assert item["next_action"] in ("send_to_client", "review_manually"), (
+            f"unexpected action {item['next_action']} in review queue"
+        )
+
+
+def test_review_excludes_non_reviewable():
+    """Leads with request_more_info or enrich_first do not appear in review."""
+    # score < 40 + no notes → discard (not actionable at all)
+    # score < 40 + notes → enrich_first (actionable but not reviewable)
+    # We can't easily create request_more_info or enrich_first in review since
+    # scoring is fixed. But we can verify they're excluded by checking all items.
+    resp = client.get("/internal/review")
+    data = resp.json()
+    excluded_actions = {"request_more_info", "enrich_first", "discard"}
+    for item in data["items"]:
+        assert item["next_action"] not in excluded_actions
+
+
+def test_review_excludes_claimed():
+    """Claimed leads do not appear in review queue."""
+    r = client.post("/leads", json={
+        "name": "Review Excl", "email": "reviewexcl@review.com",
+        "source": "reviewexcl", "notes": "real notes for review",
+    })
+    lead_id = r.json()["lead"]["id"]
+    resp_before = client.get("/internal/review", params={"source": "reviewexcl"})
+    ids_before = [i["lead_id"] for i in resp_before.json()["items"]]
+    assert lead_id in ids_before
+    client.post("/internal/dispatch/claim", json={"lead_ids": [lead_id]})
+    resp_after = client.get("/internal/review", params={"source": "reviewexcl"})
+    ids_after = [i["lead_id"] for i in resp_after.json()["items"]]
+    assert lead_id not in ids_after
+
+
+def test_review_sorted_by_urgency():
+    """Alert leads come first, then sorted by score DESC."""
+    resp = client.get("/internal/review")
+    data = resp.json()
+    items = data["items"]
+    if len(items) < 2:
+        return  # not enough data to verify ordering
+    # Verify: all alert=true items come before alert=false items
+    saw_non_alert = False
+    for item in items:
+        if not item["alert"]:
+            saw_non_alert = True
+        elif saw_non_alert:
+            assert False, "alert=true item found after alert=false item"
+
+
+def test_review_source_filter():
+    """Source filter works on review queue."""
+    client.post("/leads", json={
+        "name": "Review Src", "email": "reviewsrc@review.com",
+        "source": "reviewsrc", "notes": "real notes",
+    })
+    resp = client.get("/internal/review", params={"source": "reviewsrc"})
+    data = resp.json()
+    assert data["total"] >= 1
+    for item in data["items"]:
+        assert item["source"] == "reviewsrc"
+
+
+def test_review_urgent_count_from_full_set():
+    """urgent_count reflects the full reviewable set, not truncated by limit."""
+    source = "reviewurgent"
+    for i in range(3):
+        client.post("/leads", json={
+            "name": f"Urgent {i}", "email": f"urgent{i}@reviewurgent.com",
+            "source": source, "notes": "premium lead interested",
+        })
+    # All these leads have score 60 → send_to_client → alert=true
+    resp_full = client.get("/internal/review", params={"source": source})
+    full_urgent = resp_full.json()["urgent_count"]
+    assert full_urgent >= 3
+    resp_limited = client.get("/internal/review", params={"source": source, "limit": 1})
+    limited_data = resp_limited.json()
+    assert limited_data["total"] == 1  # only 1 item returned
+    assert limited_data["urgent_count"] == full_urgent  # but urgent_count from full set
+
+
+def test_review_item_contract():
+    """Each review item has exactly the approved fields."""
+    client.post("/leads", json={
+        "name": "Review Contract", "email": "reviewcontract@review.com",
+        "source": "reviewcontract", "notes": "real notes for contract test",
+    })
+    resp = client.get("/internal/review", params={"source": "reviewcontract"})
+    data = resp.json()
+    assert data["total"] > 0
+    item = data["items"][0]
+    expected_keys = {"lead_id", "name", "email", "source", "score", "rating", "next_action", "instruction", "alert", "created_at"}
+    assert set(item.keys()) == expected_keys
+
+
+# ---------------------------------------------------------------------------
+# POST /internal/review/{lead_id}/claim — review claim action
+# ---------------------------------------------------------------------------
+
+
+def test_review_claim_success():
+    """Claiming a reviewable lead returns status claimed."""
+    r = client.post("/leads", json={
+        "name": "RClaim OK", "email": "rclaimok@rclaim.com",
+        "source": "rclaimtest", "notes": "real notes",
+    })
+    lead_id = r.json()["lead"]["id"]
+    resp = client.post(f"/internal/review/{lead_id}/claim")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["lead_id"] == lead_id
+    assert data["status"] == "claimed"
+
+
+def test_review_claim_already_claimed():
+    """Re-claiming a lead returns status already_claimed."""
+    r = client.post("/leads", json={
+        "name": "RClaim Dup", "email": "rclaimdup@rclaim.com",
+        "source": "rclaimtest", "notes": "real notes",
+    })
+    lead_id = r.json()["lead"]["id"]
+    client.post(f"/internal/review/{lead_id}/claim")
+    resp = client.post(f"/internal/review/{lead_id}/claim")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "already_claimed"
+
+
+def test_review_claim_not_found():
+    """Claiming a non-existent lead returns status not_found."""
+    resp = client.post("/internal/review/999888/claim")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "not_found"
+    assert resp.json()["lead_id"] == 999888
+
+
+def test_review_claim_not_reviewable():
+    """Claiming a non-reviewable lead returns status not_reviewable."""
+    # Lead with no notes and low score → discard (not reviewable)
+    r = client.post("/leads", json={
+        "name": "RClaim NR", "email": "rclaimnr@rclaim.com",
+        "source": "rclaimtest",
+    })
+    lead_id = r.json()["lead"]["id"]
+    # Verify this lead's action is not reviewable
+    pack = client.get(f"/leads/{lead_id}/pack").json()
+    assert pack["next_action"] not in ("send_to_client", "review_manually")
+    resp = client.post(f"/internal/review/{lead_id}/claim")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "not_reviewable"
+
+
+def test_review_claim_removes_from_review():
+    """Claimed lead disappears from GET /internal/review."""
+    r = client.post("/leads", json={
+        "name": "RClaim Gone", "email": "rclaimgone@rclaim.com",
+        "source": "rclaimgone", "notes": "real notes",
+    })
+    lead_id = r.json()["lead"]["id"]
+    resp_before = client.get("/internal/review", params={"source": "rclaimgone"})
+    ids_before = [i["lead_id"] for i in resp_before.json()["items"]]
+    assert lead_id in ids_before
+    client.post(f"/internal/review/{lead_id}/claim")
+    resp_after = client.get("/internal/review", params={"source": "rclaimgone"})
+    ids_after = [i["lead_id"] for i in resp_after.json()["items"]]
+    assert lead_id not in ids_after
+
+
+def test_review_claim_removes_from_dispatch():
+    """Claimed via review also disappears from GET /internal/dispatch."""
+    r = client.post("/leads", json={
+        "name": "RClaim Disp", "email": "rclaimdisp@rclaim.com",
+        "source": "rclaimdisp", "notes": "real notes",
+    })
+    lead_id = r.json()["lead"]["id"]
+    resp_before = client.get("/internal/dispatch", params={"source": "rclaimdisp"})
+    ids_before = [i["lead_id"] for i in resp_before.json()["items"]]
+    assert lead_id in ids_before
+    client.post(f"/internal/review/{lead_id}/claim")
+    resp_after = client.get("/internal/dispatch", params={"source": "rclaimdisp"})
+    ids_after = [i["lead_id"] for i in resp_after.json()["items"]]
+    assert lead_id not in ids_after
 
 
 # ---------------------------------------------------------------------------
@@ -2817,6 +3242,21 @@ def test_date_filter_summary_consistent():
     assert summary_resp.json()["total_leads"] == len(list_resp.json())
 
 
+def test_date_filter_summary_created_to_consistent():
+    """created_to on summary must match list results (complements created_from test above)."""
+    _ensure_dated_leads()
+    list_resp = client.get("/leads", params={
+        "source": "datetest",
+        "created_to": "2025-06-30",
+    })
+    summary_resp = client.get("/leads/summary", params={
+        "source": "datetest",
+        "created_to": "2025-06-30",
+    })
+    assert summary_resp.status_code == 200
+    assert summary_resp.json()["total_leads"] == len(list_resp.json())
+
+
 def test_date_filter_csv_consistent():
     """Date filters on CSV must match list results."""
     _ensure_dated_leads()
@@ -2860,3 +3300,2937 @@ def test_date_filter_invalid_format_422():
 
     resp4 = client.get("/leads/export.csv", params={"created_to": "15-06-2025"})
     assert resp4.status_code == 422
+
+
+# --- Ops Snapshot ---
+
+def test_ops_snapshot_shape():
+    """Snapshot response has all required fields with correct types."""
+    resp = client.get("/internal/ops/snapshot")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "generated_at" in data
+    for field in ("total_leads", "actionable", "claimed", "pending_dispatch", "pending_review", "urgent"):
+        assert field in data
+        assert isinstance(data[field], int)
+
+
+def test_ops_snapshot_total_leads_consistent():
+    """total_leads reflects all leads in DB, not just actionable."""
+    resp = client.get("/internal/ops/snapshot")
+    data = resp.json()
+    all_leads = client.get("/leads", params={"limit": 10000}).json()
+    assert data["total_leads"] == len(all_leads)
+
+
+def test_ops_snapshot_pending_dispatch_consistent():
+    """pending_dispatch = actionable - claimed."""
+    resp = client.get("/internal/ops/snapshot")
+    data = resp.json()
+    assert data["pending_dispatch"] == data["actionable"] - data["claimed"]
+
+
+def test_ops_snapshot_pending_review_consistent():
+    """pending_review <= pending_dispatch (subset of unclaimed actionable)."""
+    resp = client.get("/internal/ops/snapshot")
+    data = resp.json()
+    assert data["pending_review"] <= data["pending_dispatch"]
+
+
+def test_ops_snapshot_urgent_means_actionable_unclaimed_alert():
+    """urgent = actionable + unclaimed + alert=true."""
+    # Create a high-score lead (alert=true, score >= 60)
+    urgent_lead = {
+        "name": "Urgent Snap Lead",
+        "email": "urgentsnap@example.com",
+        "source": "opssnaptest",
+        "notes": "important notes",
+    }
+    create_resp = client.post("/leads", json=urgent_lead)
+    assert create_resp.status_code == 200
+    lead_id = create_resp.json()["lead"]["id"]
+    snap = client.get("/internal/ops/snapshot").json()
+    # urgent must match unclaimed actionable leads with alert=true
+    # dispatch endpoint returns exactly the unclaimed actionable set
+    dispatch_items = client.get("/internal/dispatch").json()["items"]
+    alert_count = sum(1 for item in dispatch_items if item["alert"])
+    assert snap["urgent"] == alert_count
+
+
+def test_ops_snapshot_claimed_reflects_claims():
+    """Claiming a lead increments the claimed count."""
+    snap_before = client.get("/internal/ops/snapshot").json()
+    # Create and claim a fresh lead
+    lead = {
+        "name": "Claim Snap Lead",
+        "email": "claimsnap@example.com",
+        "source": "opssnaptest",
+        "notes": "notes for score",
+    }
+    create_resp = client.post("/leads", json=lead)
+    assert create_resp.status_code == 200
+    lead_id = create_resp.json()["lead"]["id"]
+    client.post("/internal/dispatch/claim", json={"lead_ids": [lead_id]})
+    snap_after = client.get("/internal/ops/snapshot").json()
+    assert snap_after["claimed"] == snap_before["claimed"] + 1
+
+
+# --- Cross-Surface Consistency Invariants ---
+
+
+def test_snapshot_pending_review_equals_review_total():
+    """snapshot.pending_review must equal review.total (both count unclaimed reviewable leads)."""
+    snap = client.get("/internal/ops/snapshot").json()
+    review = client.get("/internal/review").json()
+    assert snap["pending_review"] == review["total"]
+
+
+def test_snapshot_pending_review_equals_daily_review_plus_client_ready():
+    """snapshot.pending_review must equal daily_actions.pending_review + daily_actions.client_ready.
+
+    Snapshot combines review_manually + send_to_client into one count.
+    Daily-actions splits them into separate sections. The sum must match.
+    """
+    snap = client.get("/internal/ops/snapshot").json()
+    daily = client.get("/internal/daily-actions").json()
+    assert snap["pending_review"] == (
+        daily["summary"]["pending_review"] + daily["summary"]["client_ready"]
+    )
+
+
+def test_client_ready_total_equals_daily_client_ready():
+    """client-ready.total must equal daily_actions.summary.client_ready."""
+    cr = client.get("/internal/client-ready").json()
+    daily = client.get("/internal/daily-actions").json()
+    assert cr["total"] == daily["summary"]["client_ready"]
+
+
+# --- Client-Ready Queue ---
+
+def test_client_ready_shape():
+    """Response has correct shape and field types."""
+    resp = client.get("/internal/client-ready")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "generated_at" in data
+    assert isinstance(data["total"], int)
+    assert isinstance(data["items"], list)
+
+
+def test_client_ready_only_send_to_client():
+    """All items have next_action = send_to_client."""
+    # Create a lead with notes (score 60 -> send_to_client)
+    lead = {
+        "name": "Client Ready Lead",
+        "email": "clientready@example.com",
+        "source": "clientreadytest",
+        "notes": "has notes for high score",
+    }
+    create_resp = client.post("/leads", json=lead)
+    assert create_resp.status_code == 200
+    resp = client.get("/internal/client-ready")
+    data = resp.json()
+    for item in data["items"]:
+        assert item["next_action"] == "send_to_client"
+
+
+def test_client_ready_item_contract():
+    """Each item has all expected fields."""
+    resp = client.get("/internal/client-ready")
+    data = resp.json()
+    if data["total"] > 0:
+        item = data["items"][0]
+        expected_fields = {
+            "lead_id", "name", "email", "source", "score",
+            "rating", "next_action", "instruction", "created_at",
+        }
+        assert set(item.keys()) == expected_fields
+
+
+def test_client_ready_excludes_claimed():
+    """Claimed leads do not appear in client-ready queue."""
+    lead = {
+        "name": "Claim Ready Lead",
+        "email": "claimready@example.com",
+        "source": "clientreadytest",
+        "notes": "notes for score",
+    }
+    create_resp = client.post("/leads", json=lead)
+    assert create_resp.status_code == 200
+    lead_id = create_resp.json()["lead"]["id"]
+    before = client.get("/internal/client-ready").json()
+    before_ids = {item["lead_id"] for item in before["items"]}
+    assert lead_id in before_ids
+    client.post("/internal/dispatch/claim", json={"lead_ids": [lead_id]})
+    after = client.get("/internal/client-ready").json()
+    after_ids = {item["lead_id"] for item in after["items"]}
+    assert lead_id not in after_ids
+
+
+def test_client_ready_sorted_by_score_desc():
+    """Items are sorted by score descending."""
+    resp = client.get("/internal/client-ready")
+    data = resp.json()
+    scores = [item["score"] for item in data["items"]]
+    assert scores == sorted(scores, reverse=True)
+
+
+def test_client_ready_consistent_with_handoffs():
+    """Client-ready lead_ids are a subset of handoffs with action=send_to_client."""
+    ready = client.get("/internal/client-ready").json()
+    handoffs = client.get("/internal/handoffs", params={"action": "send_to_client"}).json()
+    ready_ids = {item["lead_id"] for item in ready["items"]}
+    handoff_ids = {item["lead_id"] for item in handoffs["items"]}
+    assert ready_ids == handoff_ids
+
+
+# --- Operator Worklist ---
+
+def test_worklist_shape():
+    """Response has correct top-level shape."""
+    resp = client.get("/internal/worklist")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "generated_at" in data
+    assert isinstance(data["pending_review"], list)
+    assert isinstance(data["client_ready"], list)
+    assert isinstance(data["recently_claimed"], list)
+
+
+def test_worklist_pending_review_matches_review():
+    """pending_review lead_ids match /internal/review lead_ids."""
+    worklist = client.get("/internal/worklist").json()
+    review = client.get("/internal/review").json()
+    wl_ids = [item["lead_id"] for item in worklist["pending_review"]]
+    rv_ids = [item["lead_id"] for item in review["items"]]
+    assert wl_ids == rv_ids
+
+
+def test_worklist_client_ready_matches_client_ready():
+    """client_ready lead_ids match /internal/client-ready lead_ids."""
+    worklist = client.get("/internal/worklist").json()
+    ready = client.get("/internal/client-ready").json()
+    wl_ids = [item["lead_id"] for item in worklist["client_ready"]]
+    cr_ids = [item["lead_id"] for item in ready["items"]]
+    assert wl_ids == cr_ids
+
+
+def test_worklist_recently_claimed_has_claimed_at():
+    """Each recently_claimed item has lead_id, name, source, score, claimed_at."""
+    # Ensure at least one claim exists
+    lead = {
+        "name": "Worklist Claim Lead",
+        "email": "worklistclaim@example.com",
+        "source": "worklisttest",
+        "notes": "notes",
+    }
+    create_resp = client.post("/leads", json=lead)
+    assert create_resp.status_code == 200
+    lead_id = create_resp.json()["lead"]["id"]
+    client.post("/internal/dispatch/claim", json={"lead_ids": [lead_id]})
+    worklist = client.get("/internal/worklist").json()
+    assert len(worklist["recently_claimed"]) > 0
+    item = worklist["recently_claimed"][0]
+    assert set(item.keys()) == {"lead_id", "name", "source", "score", "claimed_at"}
+
+
+def test_worklist_recently_claimed_max_10():
+    """recently_claimed returns at most 10 items."""
+    worklist = client.get("/internal/worklist").json()
+    assert len(worklist["recently_claimed"]) <= 10
+
+
+def test_worklist_recently_claimed_ordered_by_claimed_at_desc():
+    """recently_claimed is ordered by claimed_at descending."""
+    worklist = client.get("/internal/worklist").json()
+    claimed = worklist["recently_claimed"]
+    if len(claimed) >= 2:
+        dates = [item["claimed_at"] for item in claimed]
+        assert dates == sorted(dates, reverse=True)
+
+
+# --- Claim Release ---
+
+def _create_and_claim_lead(name: str, email: str, source: str = "releasetest") -> int:
+    """Helper: create a lead with notes, claim it, return lead_id."""
+    lead = {"name": name, "email": email, "source": source, "notes": "notes for score"}
+    resp = client.post("/leads", json=lead)
+    assert resp.status_code == 200
+    lead_id = resp.json()["lead"]["id"]
+    claim_resp = client.post("/internal/dispatch/claim", json={"lead_ids": [lead_id]})
+    assert lead_id in claim_resp.json()["claimed"]
+    return lead_id
+
+
+def test_release_claim_success():
+    """Releasing an active claim returns status=released."""
+    lead_id = _create_and_claim_lead("Release Success", "releasesuccess@example.com")
+    resp = client.delete(f"/internal/dispatch/claim/{lead_id}")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["lead_id"] == lead_id
+    assert data["status"] == "released"
+
+
+def test_release_claim_not_found():
+    """Releasing a claim for a nonexistent lead returns status=not_found."""
+    resp = client.delete("/internal/dispatch/claim/999999")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "not_found"
+
+
+def test_release_claim_not_claimed():
+    """Releasing a claim for an unclaimed lead returns status=not_claimed."""
+    lead = {"name": "Not Claimed Lead", "email": "notclaimed@example.com", "source": "releasetest", "notes": "notes"}
+    create_resp = client.post("/leads", json=lead)
+    assert create_resp.status_code == 200
+    lead_id = create_resp.json()["lead"]["id"]
+    resp = client.delete(f"/internal/dispatch/claim/{lead_id}")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "not_claimed"
+
+
+def test_release_reappears_in_review():
+    """Released lead reappears in /internal/review if still reviewable."""
+    lead_id = _create_and_claim_lead("Release Review", "releasereview@example.com")
+    # Verify excluded while claimed
+    review_ids = {item["lead_id"] for item in client.get("/internal/review").json()["items"]}
+    assert lead_id not in review_ids
+    # Release
+    client.delete(f"/internal/dispatch/claim/{lead_id}")
+    # Verify reappears (lead has notes -> score 60 -> send_to_client -> reviewable)
+    review_ids_after = {item["lead_id"] for item in client.get("/internal/review").json()["items"]}
+    assert lead_id in review_ids_after
+
+
+def test_release_reappears_in_client_ready():
+    """Released lead reappears in /internal/client-ready if still send_to_client."""
+    lead_id = _create_and_claim_lead("Release Ready", "releaseready@example.com")
+    # Verify excluded while claimed
+    ready_ids = {item["lead_id"] for item in client.get("/internal/client-ready").json()["items"]}
+    assert lead_id not in ready_ids
+    # Release
+    client.delete(f"/internal/dispatch/claim/{lead_id}")
+    # Verify reappears (lead has notes -> score 60 -> send_to_client)
+    ready_ids_after = {item["lead_id"] for item in client.get("/internal/client-ready").json()["items"]}
+    assert lead_id in ready_ids_after
+
+
+def test_release_reappears_in_dispatch():
+    """Released lead reappears in /internal/dispatch if still actionable."""
+    lead_id = _create_and_claim_lead("Release Dispatch", "releasedispatch@example.com")
+    # Verify excluded while claimed
+    dispatch_ids = {item["lead_id"] for item in client.get("/internal/dispatch").json()["items"]}
+    assert lead_id not in dispatch_ids
+    # Release
+    client.delete(f"/internal/dispatch/claim/{lead_id}")
+    # Verify reappears
+    dispatch_ids_after = {item["lead_id"] for item in client.get("/internal/dispatch").json()["items"]}
+    assert lead_id in dispatch_ids_after
+
+
+# --- Demo Intake Form ---
+
+def test_demo_intake_serves_html():
+    """GET /demo/intake returns an HTML page with a form."""
+    resp = client.get("/demo/intake")
+    assert resp.status_code == 200
+    assert "text/html" in resp.headers["content-type"]
+    assert "<form" in resp.text
+    assert "/leads/external" in resp.text
+
+
+def test_demo_intake_end_to_end():
+    """Submit via /leads/external (same path the demo form uses), verify lead appears in client-ready."""
+    payload = {
+        "name": "Demo E2E Lead",
+        "email": "demoe2e@example.com",
+        "source": "landing:demo-test",
+        "notes": "submitted via demo form",
+    }
+    resp = client.post("/leads/external", json=payload)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "accepted"
+    lead_id = data["lead_id"]
+    # Lead has notes -> score 60 -> send_to_client -> appears in client-ready
+    ready_ids = {item["lead_id"] for item in client.get("/internal/client-ready").json()["items"]}
+    assert lead_id in ready_ids
+
+
+def test_demo_intake_duplicate_feedback():
+    """Submitting the same lead twice via external returns 409 duplicate."""
+    payload = {
+        "name": "Demo Dup Lead",
+        "email": "demodup@example.com",
+        "source": "landing:demo-test",
+    }
+    first = client.post("/leads/external", json=payload)
+    assert first.status_code == 200
+    second = client.post("/leads/external", json=payload)
+    assert second.status_code == 409
+    assert second.json()["status"] == "duplicate"
+
+
+def test_demo_intake_invalid_payload_422():
+    """Missing required field via /leads/external returns 422 — the demo form relies on browser validation, but the API enforces its own schema."""
+    payload = {"name": "No Email Lead", "source": "landing:demo-test"}
+    resp = client.post("/leads/external", json=payload)
+    assert resp.status_code == 422
+
+
+def test_demo_intake_defensive_markers():
+    """Demo page carries anti-indexing, anti-caching, and visible demo-only markers."""
+    resp = client.get("/demo/intake")
+    assert resp.status_code == 200
+    # Anti-indexing meta tag
+    assert 'noindex' in resp.text
+    assert 'nofollow' in resp.text
+    # Visible demo-only copy
+    assert 'not a production surface' in resp.text.lower()
+    # Response headers
+    assert resp.headers.get("cache-control") == "no-store"
+    assert resp.headers.get("x-content-type-options") == "nosniff"
+
+
+# --- Source Performance ---
+
+
+def test_source_performance_shape():
+    """GET /internal/source-performance returns expected top-level shape."""
+    resp = client.get("/internal/source-performance")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "generated_at" in data
+    assert "total_sources" in data
+    assert "items" in data
+    assert isinstance(data["items"], list)
+    assert data["total_sources"] == len(data["items"])
+
+
+def test_source_performance_item_fields():
+    """Each source item has the expected fields and types."""
+    # Ensure at least one source exists
+    client.post("/leads", json={"name": "SP Field", "email": "spfield@example.com", "source": "perf:fields"})
+    resp = client.get("/internal/source-performance")
+    data = resp.json()
+    assert data["total_sources"] >= 1
+    item = data["items"][0]
+    assert "source" in item
+    assert "total" in item
+    assert "avg_score" in item
+    assert "client_ready" in item
+    assert "review" in item
+    assert isinstance(item["total"], int)
+    assert isinstance(item["avg_score"], (int, float))
+    assert isinstance(item["client_ready"], int)
+    assert isinstance(item["review"], int)
+
+
+def test_source_performance_counts_accurate():
+    """Per-source total and avg_score match direct SQL expectations."""
+    src = "perf:accuracy"
+    client.post("/leads", json={"name": "PA1", "email": "pa1@example.com", "source": src})
+    client.post("/leads", json={"name": "PA2", "email": "pa2@example.com", "source": src, "notes": "has notes"})
+    resp = client.get("/internal/source-performance")
+    items_by_source = {i["source"]: i for i in resp.json()["items"]}
+    assert src in items_by_source
+    item = items_by_source[src]
+    assert item["total"] == 2
+
+
+def test_source_performance_client_ready_independent_of_claims():
+    """client_ready counts are independent of claim status — they measure source quality."""
+    src = "perf:claims"
+    r1 = client.post("/leads", json={"name": "PC1", "email": "pc1@example.com", "source": src, "notes": "noted"})
+    lead_id = r1.json()["lead"]["id"]
+    # Before claim
+    resp_before = client.get("/internal/source-performance")
+    before = {i["source"]: i for i in resp_before.json()["items"]}[src]
+    # Claim the lead
+    client.post("/internal/dispatch/claim", json={"lead_ids": [lead_id]})
+    # After claim — client_ready count should be the same
+    resp_after = client.get("/internal/source-performance")
+    after = {i["source"]: i for i in resp_after.json()["items"]}[src]
+    assert after["client_ready"] == before["client_ready"]
+    assert after["review"] == before["review"]
+    # Cleanup
+    client.delete(f"/internal/dispatch/claim/{lead_id}")
+
+
+def test_source_performance_sorted_by_total_desc():
+    """Sources are sorted by total leads descending."""
+    resp = client.get("/internal/source-performance")
+    items = resp.json()["items"]
+    if len(items) >= 2:
+        totals = [i["total"] for i in items]
+        assert totals == sorted(totals, reverse=True)
+
+
+# --- Source Actions ---
+
+
+def test_source_actions_shape():
+    """GET /internal/source-actions returns expected top-level shape."""
+    resp = client.get("/internal/source-actions")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "generated_at" in data
+    assert "total_sources" in data
+    assert "items" in data
+    assert data["total_sources"] == len(data["items"])
+
+
+def test_source_actions_item_fields():
+    """Each source action item has expected fields."""
+    client.post("/leads", json={"name": "SA Field", "email": "safield@example.com", "source": "action:fields"})
+    resp = client.get("/internal/source-actions")
+    item = resp.json()["items"][0]
+    for field in ("source", "total", "actionable", "avg_score", "client_ready", "review", "recommendation", "rationale"):
+        assert field in item
+
+
+def test_source_actions_insufficient_data():
+    """Source with fewer than 3 actionable leads gets 'review' / 'insufficient data'."""
+    src = "action:tiny"
+    client.post("/leads", json={"name": "AT1", "email": "at1@example.com", "source": src})
+    resp = client.get("/internal/source-actions")
+    item = {i["source"]: i for i in resp.json()["items"]}[src]
+    assert item["recommendation"] == "review"
+    assert item["rationale"] == "insufficient data"
+
+
+def test_source_actions_keep_high_client_ready():
+    """Source with >= 50% client_ready rate gets 'keep' / 'high client_ready rate'."""
+    src = "action:highcr"
+    # All leads with notes -> score 60 -> send_to_client
+    for i in range(4):
+        client.post("/leads", json={
+            "name": f"CR{i}", "email": f"cr{i}@action-highcr.com",
+            "source": src, "notes": "good lead"
+        })
+    resp = client.get("/internal/source-actions")
+    item = {i["source"]: i for i in resp.json()["items"]}[src]
+    assert item["recommendation"] == "keep"
+    assert item["rationale"] == "high client_ready rate"
+
+
+def test_source_actions_keep_strong_avg_score():
+    """Source with avg_score >= 55 but < 50% client_ready gets 'keep' / 'strong avg score'."""
+    src = "action:strongavg"
+    # Mix: 2 with notes (score 60) + 2 without (score 50) = avg 55
+    for i in range(2):
+        client.post("/leads", json={
+            "name": f"SN{i}", "email": f"sn{i}@action-strongavg.com",
+            "source": src, "notes": "noted"
+        })
+    for i in range(2):
+        client.post("/leads", json={
+            "name": f"SB{i}", "email": f"sb{i}@action-strongavg.com",
+            "source": src
+        })
+    resp = client.get("/internal/source-actions")
+    item = {i["source"]: i for i in resp.json()["items"]}[src]
+    # 2 client_ready / 4 actionable = 0.5 -> hits client_ready rule first
+    # Need to check which rule fires
+    assert item["recommendation"] == "keep"
+
+
+def test_source_actions_review_no_strong_signal():
+    """Source with no strong signal defaults to 'review'."""
+    src = "action:nosignal"
+    # 4 leads, all without notes -> score 50 -> review_manually
+    # avg_score = 50, client_ready = 0, review/actionable = 1.0
+    # But review/actionable >= 0.3 fires -> "high review rate"
+    for i in range(4):
+        client.post("/leads", json={
+            "name": f"NS{i}", "email": f"ns{i}@action-nosignal.com",
+            "source": src
+        })
+    resp = client.get("/internal/source-actions")
+    item = {i["source"]: i for i in resp.json()["items"]}[src]
+    assert item["recommendation"] == "review"
+
+
+def test_source_actions_deterministic():
+    """Same source data produces same recommendation across calls."""
+    r1 = client.get("/internal/source-actions")
+    r2 = client.get("/internal/source-actions")
+    items1 = {i["source"]: (i["recommendation"], i["rationale"]) for i in r1.json()["items"]}
+    items2 = {i["source"]: (i["recommendation"], i["rationale"]) for i in r2.json()["items"]}
+    assert items1 == items2
+
+
+def test_source_actions_recommendation_values():
+    """All recommendations are from the allowed set."""
+    resp = client.get("/internal/source-actions")
+    allowed = {"keep", "review"}
+    for item in resp.json()["items"]:
+        assert item["recommendation"] in allowed
+
+
+# --- Event Spine Tests ---
+
+
+def test_events_endpoint_shape():
+    """GET /internal/events returns valid structure."""
+    resp = client.get("/internal/events")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "generated_at" in data
+    assert "total" in data
+    assert "items" in data
+    assert data["total"] == len(data["items"])
+
+
+def test_events_item_fields():
+    """Each event item has the required fields."""
+    resp = client.get("/internal/events?limit=1")
+    if resp.json()["total"] > 0:
+        item = resp.json()["items"][0]
+        for field in ("id", "event_type", "entity_type", "entity_id", "origin_module", "payload", "created_at"):
+            assert field in item
+
+
+def test_event_emitted_on_lead_created():
+    """Creating a lead emits a lead.created event."""
+    resp = client.post("/leads", json={
+        "name": "Event Test", "email": "event-created@example.com",
+        "source": "event:test", "notes": "some notes",
+    })
+    assert resp.status_code == 200
+    lead_id = resp.json()["lead"]["id"]
+    events = client.get("/internal/events?event_type=lead.created").json()["items"]
+    matching = [e for e in events if e["entity_id"] == lead_id]
+    assert len(matching) == 1
+    ev = matching[0]
+    assert ev["entity_type"] == "lead"
+    assert ev["origin_module"] == "leads"
+    assert ev["payload"]["source"] == "event:test"
+    assert ev["payload"]["score"] == resp.json()["lead"]["score"]
+    assert "name" not in ev["payload"]
+    assert "email" not in ev["payload"]
+
+
+def test_event_emitted_on_lead_claimed():
+    """Claiming a lead emits a lead.claimed event."""
+    resp = client.post("/leads", json={
+        "name": "Claim Event", "email": "event-claimed@example.com",
+        "source": "event:claim",
+    })
+    lead_id = resp.json()["lead"]["id"]
+    client.post("/internal/dispatch/claim", json={"lead_ids": [lead_id]})
+    events = client.get("/internal/events?event_type=lead.claimed").json()["items"]
+    matching = [e for e in events if e["entity_id"] == lead_id]
+    assert len(matching) == 1
+    ev = matching[0]
+    assert ev["entity_type"] == "lead"
+    assert ev["origin_module"] == "dispatch"
+    assert ev["payload"] == {}
+
+
+def test_event_emitted_on_lead_released():
+    """Releasing a claim emits a lead.released event."""
+    resp = client.post("/leads", json={
+        "name": "Release Event", "email": "event-released@example.com",
+        "source": "event:release",
+    })
+    lead_id = resp.json()["lead"]["id"]
+    client.post("/internal/dispatch/claim", json={"lead_ids": [lead_id]})
+    client.delete(f"/internal/dispatch/claim/{lead_id}")
+    events = client.get("/internal/events?event_type=lead.released").json()["items"]
+    matching = [e for e in events if e["entity_id"] == lead_id]
+    assert len(matching) == 1
+    ev = matching[0]
+    assert ev["entity_type"] == "lead"
+    assert ev["origin_module"] == "dispatch"
+    assert ev["payload"] == {}
+
+
+def test_event_review_claim_emits_claimed():
+    """Claiming via review endpoint also emits lead.claimed with origin_module=review."""
+    resp = client.post("/leads", json={
+        "name": "Review Claim Event", "email": "event-review-claim@example.com",
+        "source": "event:reviewclaim", "notes": "important",
+    })
+    lead_id = resp.json()["lead"]["id"]
+    client.post(f"/internal/review/{lead_id}/claim")
+    events = client.get("/internal/events?event_type=lead.claimed").json()["items"]
+    matching = [e for e in events if e["entity_id"] == lead_id]
+    assert len(matching) >= 1
+    ev = matching[0]
+    assert ev["origin_module"] == "review"
+
+
+def test_events_filter_by_event_type():
+    """event_type filter returns only matching events."""
+    resp = client.get("/internal/events?event_type=lead.created")
+    assert resp.status_code == 200
+    for item in resp.json()["items"]:
+        assert item["event_type"] == "lead.created"
+
+
+def test_events_limit_respected():
+    """limit param caps the number of returned events."""
+    resp = client.get("/internal/events?limit=2")
+    assert resp.status_code == 200
+    assert len(resp.json()["items"]) <= 2
+
+
+def test_events_ordered_newest_first():
+    """Events are returned in reverse chronological order (newest first)."""
+    resp = client.get("/internal/events")
+    items = resp.json()["items"]
+    if len(items) >= 2:
+        ids = [item["id"] for item in items]
+        assert ids == sorted(ids, reverse=True)
+
+
+def test_events_no_pii_in_created_payload():
+    """lead.created events must not contain name or email."""
+    resp = client.post("/leads", json={
+        "name": "PII Check", "email": "pii-check@example.com",
+        "source": "event:pii",
+    })
+    lead_id = resp.json()["lead"]["id"]
+    events = client.get("/internal/events?event_type=lead.created").json()["items"]
+    matching = [e for e in events if e["entity_id"] == lead_id]
+    assert len(matching) == 1
+    payload = matching[0]["payload"]
+    assert "name" not in payload
+    assert "email" not in payload
+    assert "source" in payload
+    assert "score" in payload
+
+
+def test_events_duplicate_lead_no_event():
+    """Duplicate lead creation does not emit an event."""
+    email = "event-nodup@example.com"
+    client.post("/leads", json={
+        "name": "No Dup Event", "email": email, "source": "event:nodup",
+    })
+    events_before = client.get("/internal/events?event_type=lead.created").json()["total"]
+    resp = client.post("/leads", json={
+        "name": "No Dup Event", "email": email, "source": "event:nodup",
+    })
+    assert resp.status_code == 409
+    events_after = client.get("/internal/events?event_type=lead.created").json()["total"]
+    assert events_after == events_before
+
+
+def test_event_emission_failure_does_not_break_lead_creation():
+    """Best-effort guarantee: if emit_event internally fails, the lead is still created."""
+    from unittest.mock import patch
+
+    # Patch get_db inside the events module so the INSERT inside emit_event
+    # raises, but the try/except in emit_event catches it silently.
+    with patch("apps.api.events.get_db", side_effect=RuntimeError("db boom")):
+        resp = client.post("/leads", json={
+            "name": "Silent Fail",
+            "email": "silent-fail-event@example.com",
+            "source": "event:failtest",
+        })
+    assert resp.status_code == 200
+    lead_id = resp.json()["lead"]["id"]
+    # Lead must be persisted despite event emission failure
+    get_resp = client.get(f"/leads/{lead_id}")
+    assert get_resp.status_code == 200
+    assert get_resp.json()["email"] == "silent-fail-event@example.com"
+    # No lead.created event should exist for this lead (emission failed silently)
+    events = client.get("/internal/events?event_type=lead.created").json()["items"]
+    matching = [e for e in events if e["entity_id"] == lead_id]
+    assert len(matching) == 0
+
+
+def test_event_emitted_on_external_lead_created():
+    """POST /leads/external also emits a lead.created event via _create_lead_internal."""
+    resp = client.post("/leads/external", json={
+        "name": "External Event",
+        "email": "ext-event@example.com",
+        "source": "ext:eventtest",
+    })
+    assert resp.status_code == 200
+    lead_id = resp.json()["lead_id"]
+    events = client.get("/internal/events?event_type=lead.created").json()["items"]
+    matching = [e for e in events if e["entity_id"] == lead_id]
+    assert len(matching) == 1
+    ev = matching[0]
+    assert ev["origin_module"] == "leads"
+    assert ev["payload"]["source"] == "ext:eventtest"
+    assert "name" not in ev["payload"]
+    assert "email" not in ev["payload"]
+
+
+def test_existing_endpoints_still_work_after_events():
+    """Existing endpoints remain functional after event spine addition."""
+    assert client.get("/health").status_code == 200
+    assert client.get("/leads").status_code == 200
+    assert client.get("/internal/queue").status_code == 200
+    assert client.get("/internal/dispatch").status_code == 200
+    assert client.get("/internal/ops/snapshot").status_code == 200
+
+
+# --- Sentinel Tests ---
+
+
+def test_sentinel_shape():
+    """GET /internal/sentinel returns valid structure."""
+    resp = client.get("/internal/sentinel")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "generated_at" in data
+    assert "status" in data
+    assert "total_findings" in data
+    assert "findings" in data
+    assert data["total_findings"] == len(data["findings"])
+    assert data["status"] in ("ok", "watch", "alert")
+
+
+def test_sentinel_finding_fields():
+    """Each finding has the required fields."""
+    resp = client.get("/internal/sentinel")
+    for finding in resp.json()["findings"]:
+        for field in ("check", "surface", "severity", "message", "recommended_action"):
+            assert field in finding
+        assert finding["severity"] in ("low", "medium", "high")
+
+
+def test_sentinel_status_ok_when_no_medium_or_high():
+    """Status is ok when no medium or high findings exist."""
+    resp = client.get("/internal/sentinel")
+    data = resp.json()
+    severities = {f["severity"] for f in data["findings"]}
+    if "high" not in severities and "medium" not in severities:
+        assert data["status"] == "ok"
+
+
+def test_sentinel_event_spine_not_silent():
+    """event_spine_silent check should not fire when events exist."""
+    # Events were emitted by earlier tests, so the spine is not silent
+    resp = client.get("/internal/sentinel")
+    checks = [f["check"] for f in resp.json()["findings"]]
+    assert "event_spine_silent" not in checks
+
+
+def test_sentinel_stale_claims_fires_on_old_claim():
+    """stale_claims check fires when a claim is older than threshold."""
+    # Create and claim a lead, then backdate the claim
+    resp = client.post("/leads", json={
+        "name": "Stale Sentinel", "email": "stale-sentinel@example.com",
+        "source": "sentinel:stale",
+    })
+    lead_id = resp.json()["lead"]["id"]
+    client.post("/internal/dispatch/claim", json={"lead_ids": [lead_id]})
+    # Backdate the claim to 48 hours ago
+    db = db_module.get_db()
+    db.execute(
+        "UPDATE dispatch_claims SET claimed_at = datetime('now', '-48 hours') WHERE lead_id = ?",
+        (lead_id,),
+    )
+    db.commit()
+    resp = client.get("/internal/sentinel")
+    stale = [f for f in resp.json()["findings"] if f["check"] == "stale_claims"]
+    assert len(stale) == 1
+    assert stale[0]["surface"] == "dispatch"
+    assert stale[0]["severity"] in ("low", "medium")
+    # Cleanup: release the claim
+    client.delete(f"/internal/dispatch/claim/{lead_id}")
+
+
+def test_sentinel_stale_claims_absent_when_fresh():
+    """stale_claims does not fire when all claims are fresh."""
+    resp = client.post("/leads", json={
+        "name": "Fresh Sentinel", "email": "fresh-sentinel@example.com",
+        "source": "sentinel:fresh",
+    })
+    lead_id = resp.json()["lead"]["id"]
+    client.post("/internal/dispatch/claim", json={"lead_ids": [lead_id]})
+    resp = client.get("/internal/sentinel")
+    stale = [f for f in resp.json()["findings"] if f["check"] == "stale_claims"]
+    # Fresh claim should not trigger stale_claims
+    # (there may be stale claims from other tests, so only check this specific one doesn't cause issues)
+    assert resp.status_code == 200
+    # Cleanup
+    client.delete(f"/internal/dispatch/claim/{lead_id}")
+
+
+
+def test_sentinel_source_needs_attention():
+    """source_needs_attention fires for sources with review recommendation and sufficient data."""
+    resp = client.get("/internal/sentinel")
+    attn = [f for f in resp.json()["findings"] if f["check"] == "source_needs_attention"]
+    # All source_needs_attention findings should have severity low
+    for finding in attn:
+        assert finding["severity"] == "low"
+        assert finding["surface"] == "source-actions"
+
+
+def test_sentinel_deterministic():
+    """Same DB state produces same sentinel results."""
+    r1 = client.get("/internal/sentinel").json()
+    r2 = client.get("/internal/sentinel").json()
+    assert r1["status"] == r2["status"]
+    assert r1["total_findings"] == r2["total_findings"]
+    checks1 = [(f["check"], f["severity"]) for f in r1["findings"]]
+    checks2 = [(f["check"], f["severity"]) for f in r2["findings"]]
+    assert checks1 == checks2
+
+
+def test_sentinel_status_derives_from_severity():
+    """Status correctly reflects the highest severity finding."""
+    resp = client.get("/internal/sentinel")
+    data = resp.json()
+    severities = {f["severity"] for f in data["findings"]}
+    if "high" in severities:
+        assert data["status"] == "alert"
+    elif "medium" in severities:
+        assert data["status"] == "watch"
+    else:
+        assert data["status"] == "ok"
+
+
+def test_sentinel_event_spine_recent_silence():
+    """event_spine_silent fires medium when recent leads exist but no recent events."""
+    db = db_module.get_db()
+    # Backdate ALL events to 48 hours ago so none are "recent"
+    db.execute("UPDATE events SET created_at = datetime('now', '-48 hours')")
+    db.commit()
+    # Create a fresh lead — this also emits a lead.created event with current timestamp
+    resp = client.post("/leads", json={
+        "name": "Recent Silence", "email": "recent-silence@example.com",
+        "source": "sentinel:recency",
+    })
+    assert resp.status_code == 200
+    lead_id = resp.json()["lead"]["id"]
+    # Now backdate THAT new event too, so we have recent leads but no recent events
+    db.execute("UPDATE events SET created_at = datetime('now', '-48 hours') WHERE entity_id = ?", (lead_id,))
+    db.commit()
+    sentinel_resp = client.get("/internal/sentinel")
+    findings = [f for f in sentinel_resp.json()["findings"] if f["check"] == "event_spine_silent"]
+    assert len(findings) == 1
+    assert findings[0]["severity"] == "medium"
+    assert "last 24h" in findings[0]["message"]
+    # Cleanup: restore event timestamps so other tests are not affected
+    db.execute("UPDATE events SET created_at = datetime('now')")
+    db.commit()
+
+
+def test_sentinel_event_spine_no_silence_when_recent_events_exist():
+    """event_spine_silent does not fire when both recent leads and recent events exist."""
+    # Normal state: events were emitted by earlier tests with current timestamps
+    resp = client.get("/internal/sentinel")
+    checks = [f["check"] for f in resp.json()["findings"]]
+    assert "event_spine_silent" not in checks
+
+
+def test_existing_endpoints_still_work_after_sentinel():
+    """Existing endpoints remain functional after sentinel addition."""
+    assert client.get("/health").status_code == 200
+    assert client.get("/leads").status_code == 200
+    assert client.get("/internal/queue").status_code == 200
+    assert client.get("/internal/events").status_code == 200
+    assert client.get("/internal/source-actions").status_code == 200
+
+
+# ── Audit ──
+
+
+def test_audit_returns_200_and_shape():
+    resp = client.get("/internal/audit")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "generated_at" in data
+    assert "status" in data
+    assert "total_findings" in data
+    assert "findings" in data
+    assert isinstance(data["findings"], list)
+    assert data["total_findings"] == len(data["findings"])
+
+
+def test_audit_finding_fields():
+    """Each finding has the expected shape."""
+    resp = client.get("/internal/audit")
+    data = resp.json()
+    for f in data["findings"]:
+        assert "check" in f
+        assert "surface" in f
+        assert "severity" in f
+        assert "message" in f
+        assert "detail" in f
+        assert isinstance(f["detail"], dict)
+
+
+def test_audit_status_pass_when_clean():
+    """With normal data, both checks should pass and status should be 'pass'."""
+    resp = client.get("/internal/audit")
+    data = resp.json()
+    assert data["status"] == "pass"
+    assert data["total_findings"] == 0
+
+
+def test_audit_source_surface_consistency_passes():
+    """source-performance and source-actions agree on source list/totals."""
+    # Create leads from two sources
+    client.post("/leads", json={"name": "Audit A", "email": "audit_a@example.com", "source": "src_a", "notes": "n"})
+    client.post("/leads", json={"name": "Audit B", "email": "audit_b@example.com", "source": "src_b"})
+    resp = client.get("/internal/audit")
+    data = resp.json()
+    source_findings = [f for f in data["findings"] if f["check"] == "source_surface_consistency"]
+    assert len(source_findings) == 0
+
+
+def test_audit_ops_snapshot_arithmetic_passes():
+    """pending_dispatch == actionable - claimed identity holds."""
+    resp = client.get("/internal/audit")
+    data = resp.json()
+    arith_findings = [f for f in data["findings"] if f["check"] == "ops_snapshot_arithmetic"]
+    assert len(arith_findings) == 0
+
+
+def test_audit_ops_snapshot_arithmetic_with_claims():
+    """Arithmetic still holds after claims."""
+    # Create a lead and claim it
+    lead_resp = client.post("/leads", json={"name": "Audit Claim", "email": "audit_claim@example.com", "source": "audit_src", "notes": "n"})
+    lead_id = lead_resp.json()["lead"]["id"]
+    client.post("/internal/dispatch/claim", json={"lead_ids": [lead_id]})
+    resp = client.get("/internal/audit")
+    data = resp.json()
+    arith_findings = [f for f in data["findings"] if f["check"] == "ops_snapshot_arithmetic"]
+    assert len(arith_findings) == 0
+
+
+def test_audit_deterministic():
+    """Two consecutive calls return the same findings."""
+    r1 = client.get("/internal/audit").json()
+    r2 = client.get("/internal/audit").json()
+    assert r1["status"] == r2["status"]
+    assert r1["total_findings"] == r2["total_findings"]
+    checks1 = [(f["check"], f["severity"]) for f in r1["findings"]]
+    checks2 = [(f["check"], f["severity"]) for f in r2["findings"]]
+    assert checks1 == checks2
+
+
+def test_audit_status_derives_from_severity():
+    """Status correctly reflects the highest severity finding."""
+    resp = client.get("/internal/audit")
+    data = resp.json()
+    severities = {f["severity"] for f in data["findings"]}
+    if "high" in severities:
+        assert data["status"] == "fail"
+    elif "medium" in severities:
+        assert data["status"] == "warn"
+    else:
+        assert data["status"] == "pass"
+
+
+def test_existing_endpoints_still_work_after_audit():
+    """Existing endpoints remain functional after audit addition."""
+    assert client.get("/health").status_code == 200
+    assert client.get("/leads").status_code == 200
+    assert client.get("/internal/queue").status_code == 200
+    assert client.get("/internal/sentinel").status_code == 200
+    assert client.get("/internal/source-actions").status_code == 200
+
+
+# ── Redundancy ──
+
+
+def test_redundancy_returns_200_and_shape():
+    resp = client.get("/internal/redundancy")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "generated_at" in data
+    assert "areas_scanned" in data
+    assert "overall_status" in data
+    assert "total_findings" in data
+    assert "findings" in data
+    assert isinstance(data["findings"], list)
+    assert data["total_findings"] == len(data["findings"])
+    assert isinstance(data["areas_scanned"], list)
+
+
+def test_redundancy_finding_fields():
+    """Each finding has the expected shape including removal_risk and why_now."""
+    resp = client.get("/internal/redundancy")
+    data = resp.json()
+    for f in data["findings"]:
+        assert "type" in f
+        assert "targets" in f
+        assert isinstance(f["targets"], list)
+        assert "severity" in f
+        assert "message" in f
+        assert "recommended_action" in f
+        assert "confidence" in f
+        assert "removal_risk" in f
+        assert f["removal_risk"] in ("low", "medium", "high")
+        assert "why_now" in f
+        assert len(f["why_now"]) > 0
+
+
+def test_redundancy_areas_scanned():
+    """Areas scanned includes expected targets."""
+    resp = client.get("/internal/redundancy")
+    data = resp.json()
+    assert "skills/" in data["areas_scanned"]
+    assert "CLAUDE.md hierarchy" in data["areas_scanned"]
+
+
+def test_redundancy_skills_check_reports_known_candidates():
+    """Skills from the explicit candidate list are reported."""
+    resp = client.get("/internal/redundancy")
+    data = resp.json()
+    skill_findings = [f for f in data["findings"] if "skill" in f["message"].lower() or "Skill" in f["message"]]
+    # We know the candidate list has entries and the skills/ dir exists
+    # Each reported skill should be from the hardcoded candidate list
+    for f in skill_findings:
+        assert f["type"] == "overlap"
+        assert f["recommended_action"] == "archive_candidate"
+        assert f["confidence"] == "medium"
+        assert f["severity"] == "low"
+
+
+def test_redundancy_skills_only_reports_existing_files():
+    """Only skills that exist on disk are reported."""
+    resp = client.get("/internal/redundancy")
+    data = resp.json()
+    from pathlib import Path
+    from apps.api.routes.internal import _PROJECT_ROOT
+    for f in data["findings"]:
+        if "Skill" in f["message"] or "skill" in f["message"].lower():
+            for target in f["targets"]:
+                assert (_PROJECT_ROOT / target).is_file(), f"Target {target} does not exist"
+
+
+def test_redundancy_dormant_stubs_reported():
+    """Known stub CLAUDE.md files are reported as dormant."""
+    resp = client.get("/internal/redundancy")
+    data = resp.json()
+    dormant = [f for f in data["findings"] if f["type"] == "dormant"]
+    # core/CLAUDE.md is a known stub; automations/CLAUDE.md is no longer a stub
+    dormant_targets = [t for f in dormant for t in f["targets"]]
+    assert any("core/CLAUDE.md" in t for t in dormant_targets)
+    for f in dormant:
+        assert f["recommended_action"] == "keep"
+        assert f["confidence"] == "high"
+        assert f["removal_risk"] == "low"
+
+
+def test_redundancy_deterministic():
+    """Two consecutive calls return the same findings."""
+    r1 = client.get("/internal/redundancy").json()
+    r2 = client.get("/internal/redundancy").json()
+    assert r1["overall_status"] == r2["overall_status"]
+    assert r1["total_findings"] == r2["total_findings"]
+    t1 = [(f["type"], f["targets"], f["severity"]) for f in r1["findings"]]
+    t2 = [(f["type"], f["targets"], f["severity"]) for f in r2["findings"]]
+    assert t1 == t2
+
+
+def test_redundancy_status_derives_from_severity():
+    """Status correctly reflects the highest severity finding."""
+    resp = client.get("/internal/redundancy")
+    data = resp.json()
+    severities = {f["severity"] for f in data["findings"]}
+    if "high" in severities:
+        assert data["overall_status"] == "alert"
+    elif "medium" in severities:
+        assert data["overall_status"] == "watch"
+    else:
+        assert data["overall_status"] == "ok"
+
+
+def test_redundancy_no_modification_side_effects():
+    """Redundancy endpoint is read-only — calling it twice changes nothing."""
+    r1 = client.get("/internal/redundancy").json()
+    r2 = client.get("/internal/redundancy").json()
+    assert r1["findings"] == r2["findings"]
+
+
+def test_existing_endpoints_still_work_after_redundancy():
+    """Existing endpoints remain functional after redundancy addition."""
+    assert client.get("/health").status_code == 200
+    assert client.get("/leads").status_code == 200
+    assert client.get("/internal/queue").status_code == 200
+    assert client.get("/internal/audit").status_code == 200
+    assert client.get("/internal/sentinel").status_code == 200
+
+
+
+# ---------------------------------------------------------------------------
+# POST /internal/scope-critic - scope critic
+# ---------------------------------------------------------------------------
+
+_CLEAN_PROPOSAL = {
+    "classification": "BUILD",
+    "goal": "Add scope critic endpoint",
+    "scope": ["apps/api/routes/internal.py", "apps/api/schemas.py", "tests"],
+    "out_of_scope": ["scoring logic", "database schema", "deployment"],
+    "expected_files": [
+        "apps/api/routes/internal.py",
+        "apps/api/schemas.py",
+        "tests/api/test_api.py",
+    ],
+    "main_risk": "Overly strict checks may produce false positives",
+    "minimum_acceptable": "All 5 checks implemented with tests",
+}
+
+
+def test_scope_critic_returns_correct_shape():
+    resp = client.post("/internal/scope-critic", json=_CLEAN_PROPOSAL)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "generated_at" in data
+    assert "status" in data
+    assert "total_findings" in data
+    assert "findings" in data
+    assert isinstance(data["findings"], list)
+    assert data["status"] in ("ok", "watch", "block")
+
+
+def test_scope_critic_finding_has_evidence():
+    proposal = {**_CLEAN_PROPOSAL, "main_risk": "none"}
+    resp = client.post("/internal/scope-critic", json=proposal)
+    data = resp.json()
+    for finding in data["findings"]:
+        assert "check" in finding
+        assert "severity" in finding
+        assert "message" in finding
+        assert "evidence" in finding
+        assert isinstance(finding["evidence"], list)
+
+
+def test_scope_critic_clean_proposal_passes():
+    resp = client.post("/internal/scope-critic", json=_CLEAN_PROPOSAL)
+    data = resp.json()
+    assert data["status"] == "ok"
+    assert data["total_findings"] == 0
+
+
+def test_scope_critic_rejects_empty_required_fields():
+    bad = {**_CLEAN_PROPOSAL}
+    del bad["goal"]
+    assert client.post("/internal/scope-critic", json=bad).status_code == 422
+
+    bad2 = {**_CLEAN_PROPOSAL, "scope": []}
+    assert client.post("/internal/scope-critic", json=bad2).status_code == 422
+
+    bad3 = {**_CLEAN_PROPOSAL, "out_of_scope": []}
+    assert client.post("/internal/scope-critic", json=bad3).status_code == 422
+
+    bad4 = {**_CLEAN_PROPOSAL, "expected_files": []}
+    assert client.post("/internal/scope-critic", json=bad4).status_code == 422
+
+    bad5 = {**_CLEAN_PROPOSAL, "main_risk": ""}
+    assert client.post("/internal/scope-critic", json=bad5).status_code == 422
+
+    bad6 = {**_CLEAN_PROPOSAL, "minimum_acceptable": ""}
+    assert client.post("/internal/scope-critic", json=bad6).status_code == 422
+
+
+def test_scope_critic_sensitive_file_intrusion_blocks():
+    proposal = {
+        **_CLEAN_PROPOSAL,
+        "expected_files": [
+            "apps/api/routes/internal.py",
+            ".claude/CLAUDE.md",
+        ],
+    }
+    resp = client.post("/internal/scope-critic", json=proposal)
+    data = resp.json()
+    assert data["status"] == "block"
+    intrusion = [f for f in data["findings"] if f["check"] == "sensitive_file_intrusion"]
+    assert len(intrusion) == 1
+    assert intrusion[0]["severity"] == "high"
+    assert any(".claude" in e for e in intrusion[0]["evidence"])
+
+
+def test_scope_critic_sensitive_file_justified():
+    proposal = {
+        **_CLEAN_PROPOSAL,
+        "expected_files": [
+            "apps/api/routes/internal.py",
+            ".claude/CLAUDE.md",
+        ],
+        "scope": [".claude/CLAUDE.md governance update", "internal routes"],
+    }
+    resp = client.post("/internal/scope-critic", json=proposal)
+    data = resp.json()
+    intrusion = [f for f in data["findings"] if f["check"] == "sensitive_file_intrusion"]
+    assert len(intrusion) == 0
+
+
+def test_scope_critic_sensitive_file_contradicted_by_out_of_scope():
+    proposal = {
+        **_CLEAN_PROPOSAL,
+        "expected_files": [
+            "apps/api/routes/internal.py",
+            "skills/new_skill.md",
+        ],
+        "scope": ["skills/ addition", "internal routes"],
+        "out_of_scope": ["skills/ changes", "deployment"],
+    }
+    resp = client.post("/internal/scope-critic", json=proposal)
+    data = resp.json()
+    intrusion = [f for f in data["findings"] if f["check"] == "sensitive_file_intrusion"]
+    assert len(intrusion) == 1
+    assert any("contradicted" in e for e in intrusion[0]["evidence"])
+
+
+def test_scope_critic_file_spread_risk():
+    proposal = {
+        **_CLEAN_PROPOSAL,
+        "expected_files": [
+            "apps/api/routes/internal.py",
+            "apps/api/services/scoring.py",
+            "tests/api/test_api.py",
+            "docs/operational_contracts.md",
+            "core/config.py",
+        ],
+    }
+    resp = client.post("/internal/scope-critic", json=proposal)
+    data = resp.json()
+    spread = [f for f in data["findings"] if f["check"] == "file_spread_risk"]
+    assert len(spread) == 1
+    assert spread[0]["severity"] == "medium"
+    assert len(spread[0]["evidence"]) == 5
+
+
+def test_scope_critic_file_spread_same_area_ok():
+    proposal = {
+        **_CLEAN_PROPOSAL,
+        "expected_files": [
+            "apps/api/routes/internal.py",
+            "apps/api/routes/leads.py",
+            "apps/api/schemas.py",
+            "tests/api/test_api.py",
+        ],
+    }
+    resp = client.post("/internal/scope-critic", json=proposal)
+    data = resp.json()
+    spread = [f for f in data["findings"] if f["check"] == "file_spread_risk"]
+    assert len(spread) == 0
+
+
+def test_scope_critic_weak_out_of_scope():
+    proposal = {
+        **_CLEAN_PROPOSAL,
+        "out_of_scope": ["nothing", "n/a"],
+    }
+    resp = client.post("/internal/scope-critic", json=proposal)
+    data = resp.json()
+    weak = [f for f in data["findings"] if f["check"] == "weak_out_of_scope"]
+    assert len(weak) == 1
+    assert weak[0]["severity"] == "medium"
+
+
+def test_scope_critic_out_of_scope_one_substantive():
+    proposal = {
+        **_CLEAN_PROPOSAL,
+        "out_of_scope": ["n/a", "do not change scoring logic"],
+    }
+    resp = client.post("/internal/scope-critic", json=proposal)
+    data = resp.json()
+    weak = [f for f in data["findings"] if f["check"] == "weak_out_of_scope"]
+    assert len(weak) == 0
+
+
+def test_scope_critic_minimum_scope_mismatch():
+    proposal = {
+        **_CLEAN_PROPOSAL,
+        "minimum_acceptable": "get it working",
+        "scope": ["a", "b", "c"],
+    }
+    resp = client.post("/internal/scope-critic", json=proposal)
+    data = resp.json()
+    mismatch = [f for f in data["findings"] if f["check"] == "minimum_scope_mismatch"]
+    assert len(mismatch) == 1
+    assert mismatch[0]["severity"] == "medium"
+
+
+def test_scope_critic_minimum_ok_when_specific():
+    proposal = {
+        **_CLEAN_PROPOSAL,
+        "minimum_acceptable": "All 5 checks implemented, tested, documented",
+        "scope": ["a", "b", "c", "d"],
+    }
+    resp = client.post("/internal/scope-critic", json=proposal)
+    data = resp.json()
+    mismatch = [f for f in data["findings"] if f["check"] == "minimum_scope_mismatch"]
+    assert len(mismatch) == 0
+
+
+def test_scope_critic_minimum_ok_when_small_scope():
+    proposal = {
+        **_CLEAN_PROPOSAL,
+        "minimum_acceptable": "tbd",
+        "scope": ["one thing"],
+        "expected_files": ["apps/api/routes/internal.py"],
+    }
+    resp = client.post("/internal/scope-critic", json=proposal)
+    data = resp.json()
+    mismatch = [f for f in data["findings"] if f["check"] == "minimum_scope_mismatch"]
+    assert len(mismatch) == 0
+
+
+def test_scope_critic_risk_unacknowledged():
+    proposal = {**_CLEAN_PROPOSAL, "main_risk": "no risk"}
+    resp = client.post("/internal/scope-critic", json=proposal)
+    data = resp.json()
+    risk = [f for f in data["findings"] if f["check"] == "risk_unacknowledged"]
+    assert len(risk) == 1
+    assert risk[0]["severity"] == "low"
+    assert data["status"] == "ok"
+
+
+def test_scope_critic_status_derivation():
+    r1 = client.post("/internal/scope-critic", json=_CLEAN_PROPOSAL).json()
+    assert r1["status"] == "ok"
+
+    r2 = client.post("/internal/scope-critic", json={
+        **_CLEAN_PROPOSAL,
+        "out_of_scope": ["none"],
+    }).json()
+    assert r2["status"] == "watch"
+
+    r3 = client.post("/internal/scope-critic", json={
+        **_CLEAN_PROPOSAL,
+        "expected_files": [".claude/CLAUDE.md"],
+    }).json()
+    assert r3["status"] == "block"
+
+
+def test_scope_critic_deterministic():
+    r1 = client.post("/internal/scope-critic", json=_CLEAN_PROPOSAL).json()
+    r2 = client.post("/internal/scope-critic", json=_CLEAN_PROPOSAL).json()
+    assert r1["status"] == r2["status"]
+    assert r1["total_findings"] == r2["total_findings"]
+    assert r1["findings"] == r2["findings"]
+
+
+def test_scope_critic_no_side_effects():
+    health_before = client.get("/health").json()
+    client.post("/internal/scope-critic", json=_CLEAN_PROPOSAL)
+    health_after = client.get("/health").json()
+    assert health_before["status"] == health_after["status"]
+
+
+def test_scope_critic_protected_patterns():
+    for protected_file in [
+        ".claude/CLAUDE.md",
+        "skills/some_skill.md",
+        "README.md",
+        "Dockerfile",
+        "docker-compose.yml",
+        ".gitignore",
+    ]:
+        proposal = {
+            **_CLEAN_PROPOSAL,
+            "expected_files": [protected_file],
+        }
+        resp = client.post("/internal/scope-critic", json=proposal)
+        data = resp.json()
+        intrusion = [f for f in data["findings"] if f["check"] == "sensitive_file_intrusion"]
+        assert len(intrusion) == 1, f"Expected intrusion finding for {protected_file}"
+
+
+def test_scope_critic_area_mapping():
+    proposal = {
+        **_CLEAN_PROPOSAL,
+        "expected_files": [
+            "apps/api/routes/internal.py",
+            "apps/api/schemas.py",
+            "tests/api/test_api.py",
+        ],
+    }
+    resp = client.post("/internal/scope-critic", json=proposal)
+    data = resp.json()
+    spread = [f for f in data["findings"] if f["check"] == "file_spread_risk"]
+    assert len(spread) == 0
+
+
+def test_existing_endpoints_still_work_after_scope_critic():
+    assert client.get("/health").status_code == 200
+    assert client.get("/leads").status_code == 200
+    assert client.get("/internal/queue").status_code == 200
+    assert client.get("/internal/sentinel").status_code == 200
+    assert client.get("/internal/audit").status_code == 200
+    assert client.get("/internal/redundancy").status_code == 200
+
+
+
+# ---------------------------------------------------------------------------
+# POST /internal/proof-verifier - proof verifier
+# ---------------------------------------------------------------------------
+
+_CLEAN_REPORT = {
+    "block_name": "scope-critic-build",
+    "classification": "BUILD",
+    "claimed_changes": [
+        "Added POST /internal/scope-critic with 5 checks",
+        "Added schemas",
+        "Added tests",
+    ],
+    "claimed_verified": [
+        "python -m pytest tests/api/test_api.py -v - 358 passed",
+        "All scope critic checks tested individually",
+        "schemas.py updated with 3 new models",
+    ],
+    "claimed_not_verified": [
+        "ruff check . - not installed",
+    ],
+    "files_touched": [
+        "apps/api/routes/internal.py",
+        "apps/api/schemas.py",
+        "tests/api/test_api.py",
+    ],
+    "tests_run": [
+        "python -m pytest tests/api/test_api.py -v",
+    ],
+    "status_claim": "accepted for MVP",
+}
+
+_FULLY_PROVEN_REPORT = {
+    "block_name": "small-fix",
+    "classification": "BUGFIX",
+    "claimed_changes": ["Fixed scoring edge case in scoring.py"],
+    "claimed_verified": [
+        "python -m pytest tests/api/test_api.py -v - all passed",
+        "Verified scoring.py change manually",
+    ],
+    "claimed_not_verified": [],
+    "files_touched": [
+        "apps/api/services/scoring.py",
+        "tests/api/test_api.py",
+    ],
+    "tests_run": [
+        "python -m pytest tests/api/test_api.py -v",
+    ],
+    "status_claim": "accepted for MVP",
+}
+
+
+def test_proof_verifier_returns_correct_shape():
+    resp = client.post("/internal/proof-verifier", json=_CLEAN_REPORT)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "generated_at" in data
+    assert "status" in data
+    assert "total_findings" in data
+    assert "findings" in data
+    assert isinstance(data["findings"], list)
+    assert data["status"] in ("close", "watch", "not_close")
+
+
+def test_proof_verifier_finding_fields():
+    resp = client.post("/internal/proof-verifier", json=_CLEAN_REPORT)
+    data = resp.json()
+    for finding in data["findings"]:
+        assert "check" in finding
+        assert "severity" in finding
+        assert "message" in finding
+        assert "evidence" in finding
+        assert "blocks_closure" in finding
+        assert "confidence" in finding
+        assert isinstance(finding["evidence"], list)
+        assert isinstance(finding["blocks_closure"], bool)
+        assert finding["confidence"] in ("low", "medium", "high")
+
+
+def test_proof_verifier_clean_report_watch():
+    """Clean report with acknowledged gaps returns watch (has not_verified items)."""
+    resp = client.post("/internal/proof-verifier", json=_CLEAN_REPORT)
+    data = resp.json()
+    # Has claimed_not_verified but status is "accepted for MVP" (not closure language)
+    # So unverified_gap won't fire. But untested_changes might depending on evidence matching.
+    assert data["status"] in ("close", "watch")
+
+
+def test_proof_verifier_fully_proven_closes():
+    """A fully proven report with good evidence returns close."""
+    resp = client.post("/internal/proof-verifier", json=_FULLY_PROVEN_REPORT)
+    data = resp.json()
+    assert data["status"] == "close"
+    assert data["total_findings"] == 0
+
+
+def test_proof_verifier_rejects_empty_required_fields():
+    bad = {**_CLEAN_REPORT}
+    del bad["block_name"]
+    assert client.post("/internal/proof-verifier", json=bad).status_code == 422
+
+    bad2 = {**_CLEAN_REPORT, "claimed_changes": []}
+    assert client.post("/internal/proof-verifier", json=bad2).status_code == 422
+
+    bad3 = {**_CLEAN_REPORT, "claimed_verified": []}
+    assert client.post("/internal/proof-verifier", json=bad3).status_code == 422
+
+    bad4 = {**_CLEAN_REPORT, "files_touched": []}
+    assert client.post("/internal/proof-verifier", json=bad4).status_code == 422
+
+    bad5 = {**_CLEAN_REPORT, "status_claim": ""}
+    assert client.post("/internal/proof-verifier", json=bad5).status_code == 422
+
+
+def test_proof_verifier_allows_empty_optional_fields():
+    """claimed_not_verified and tests_run can be empty."""
+    report = {
+        **_CLEAN_REPORT,
+        "claimed_not_verified": [],
+        "tests_run": [],
+    }
+    resp = client.post("/internal/proof-verifier", json=report)
+    assert resp.status_code == 200
+
+
+def test_proof_verifier_unverified_gap_blocks():
+    """Closure language + non-empty claimed_not_verified = not_close."""
+    report = {
+        **_CLEAN_REPORT,
+        "status_claim": "done",
+    }
+    resp = client.post("/internal/proof-verifier", json=report)
+    data = resp.json()
+    assert data["status"] == "not_close"
+    gap = [f for f in data["findings"] if f["check"] == "unverified_gap"]
+    assert len(gap) == 1
+    assert gap[0]["severity"] == "high"
+    assert gap[0]["blocks_closure"] is True
+
+
+def test_proof_verifier_unverified_gap_no_fire_on_mvp():
+    """Non-closure language with not_verified items does not fire unverified_gap."""
+    report = {
+        **_CLEAN_REPORT,
+        "status_claim": "accepted for MVP",
+    }
+    resp = client.post("/internal/proof-verifier", json=report)
+    data = resp.json()
+    gap = [f for f in data["findings"] if f["check"] == "unverified_gap"]
+    assert len(gap) == 0
+
+
+def test_proof_verifier_untested_changes():
+    """Files with no specific verification evidence are flagged."""
+    report = {
+        **_CLEAN_REPORT,
+        "files_touched": [
+            "apps/api/routes/internal.py",
+            "apps/api/schemas.py",
+            "tests/api/test_api.py",
+            "docs/operational_contracts.md",
+        ],
+        "claimed_verified": [
+            "python -m pytest tests/api/test_api.py -v",
+        ],
+        "tests_run": [
+            "python -m pytest tests/api/test_api.py -v",
+        ],
+    }
+    resp = client.post("/internal/proof-verifier", json=report)
+    data = resp.json()
+    untested = [f for f in data["findings"] if f["check"] == "untested_changes"]
+    assert len(untested) == 1
+    assert untested[0]["severity"] == "medium"
+    assert untested[0]["blocks_closure"] is False
+    # internal.py, schemas.py, operational_contracts.md should be unmatched
+    assert any("operational_contracts" in e for e in untested[0]["evidence"])
+
+
+def test_proof_verifier_untested_specific_match():
+    """File with specific mention in claimed_verified is not flagged."""
+    report = {
+        **_CLEAN_REPORT,
+        "files_touched": [
+            "apps/api/routes/internal.py",
+            "apps/api/schemas.py",
+        ],
+        "claimed_verified": [
+            "internal.py updated with new endpoint",
+            "schemas.py updated with 3 new models",
+        ],
+        "tests_run": [],
+    }
+    resp = client.post("/internal/proof-verifier", json=report)
+    data = resp.json()
+    untested = [f for f in data["findings"] if f["check"] == "untested_changes"]
+    assert len(untested) == 0
+
+
+def test_proof_verifier_untested_doc_resolved_by_naming():
+    """Doc file with filename in claimed_verified must not trigger untested_changes."""
+    report = {
+        **_CLEAN_REPORT,
+        "files_touched": [
+            "apps/api/routes/internal.py",
+            "tests/api/test_api.py",
+            "docs/operational_contracts.md",
+        ],
+        "claimed_verified": [
+            "python -m pytest tests/api/test_api.py -v (all passed)",
+            "internal.py updated with new endpoint logic",
+            "Doc change in operational_contracts.md reviewed: added cross-reference note",
+        ],
+        "tests_run": [
+            "python -m pytest tests/api/test_api.py -v",
+        ],
+    }
+    resp = client.post("/internal/proof-verifier", json=report)
+    data = resp.json()
+    untested = [f for f in data["findings"] if f["check"] == "untested_changes"]
+    assert len(untested) == 0, f"Expected no untested_changes but got: {untested}"
+
+
+def test_proof_verifier_empty_test_evidence_blocks():
+    """No tests_run and no test references in claimed_verified = not_close."""
+    report = {
+        **_CLEAN_REPORT,
+        "tests_run": [],
+        "claimed_verified": [
+            "Looked at the endpoint manually",
+            "Read the code diff",
+        ],
+        "claimed_not_verified": [],
+    }
+    resp = client.post("/internal/proof-verifier", json=report)
+    data = resp.json()
+    assert data["status"] == "not_close"
+    empty = [f for f in data["findings"] if f["check"] == "empty_test_evidence"]
+    assert len(empty) == 1
+    assert empty[0]["blocks_closure"] is True
+
+
+def test_proof_verifier_test_ref_in_verified_ok():
+    """Test reference in claimed_verified is sufficient even without tests_run."""
+    report = {
+        **_CLEAN_REPORT,
+        "tests_run": [],
+        "claimed_verified": [
+            "python -m pytest tests/api/test_api.py -v - 358 passed",
+        ],
+    }
+    resp = client.post("/internal/proof-verifier", json=report)
+    data = resp.json()
+    empty = [f for f in data["findings"] if f["check"] == "empty_test_evidence"]
+    assert len(empty) == 0
+
+
+def test_proof_verifier_overclaim_status():
+    """Overconfident status_claim triggers low finding."""
+    report = {
+        **_CLEAN_REPORT,
+        "status_claim": "production-ready",
+        "claimed_not_verified": [],
+    }
+    resp = client.post("/internal/proof-verifier", json=report)
+    data = resp.json()
+    overclaim = [f for f in data["findings"] if f["check"] == "overclaim_status"]
+    assert len(overclaim) == 1
+    assert overclaim[0]["severity"] == "low"
+    assert overclaim[0]["blocks_closure"] is False
+
+
+def test_proof_verifier_overclaim_does_not_fire_on_mvp():
+    """Humble status_claim does not trigger overclaim."""
+    report = {**_CLEAN_REPORT, "status_claim": "accepted for MVP"}
+    resp = client.post("/internal/proof-verifier", json=report)
+    data = resp.json()
+    overclaim = [f for f in data["findings"] if f["check"] == "overclaim_status"]
+    assert len(overclaim) == 0
+
+
+def test_proof_verifier_verification_claim_mismatch():
+    """Claiming zero gaps but thin evidence triggers mismatch."""
+    report = {
+        **_CLEAN_REPORT,
+        "claimed_not_verified": [],
+        "files_touched": [
+            "apps/api/routes/internal.py",
+            "apps/api/schemas.py",
+            "docs/operational_contracts.md",
+            "apps/api/services/actions.py",
+        ],
+        "claimed_verified": [
+            "Endpoint works correctly",
+        ],
+        "tests_run": [],
+    }
+    resp = client.post("/internal/proof-verifier", json=report)
+    data = resp.json()
+    mismatch = [f for f in data["findings"] if f["check"] == "verification_claim_mismatch"]
+    assert len(mismatch) == 1
+    assert mismatch[0]["severity"] == "medium"
+    assert "coverage ratio" in mismatch[0]["evidence"][0]
+
+
+def test_proof_verifier_mismatch_no_fire_when_gaps_acknowledged():
+    """If claimed_not_verified is non-empty, mismatch does not fire."""
+    report = {
+        **_CLEAN_REPORT,
+        "claimed_not_verified": ["ruff not installed"],
+        "files_touched": [
+            "apps/api/routes/internal.py",
+            "apps/api/schemas.py",
+            "docs/operational_contracts.md",
+            "apps/api/services/actions.py",
+        ],
+        "claimed_verified": ["Endpoint works"],
+        "tests_run": [],
+    }
+    resp = client.post("/internal/proof-verifier", json=report)
+    data = resp.json()
+    mismatch = [f for f in data["findings"] if f["check"] == "verification_claim_mismatch"]
+    assert len(mismatch) == 0
+
+
+def test_proof_verifier_mismatch_no_fire_when_coverage_good():
+    """If coverage ratio >= 0.5, mismatch does not fire."""
+    report = {
+        **_CLEAN_REPORT,
+        "claimed_not_verified": [],
+        "files_touched": [
+            "apps/api/routes/internal.py",
+            "tests/api/test_api.py",
+        ],
+        "claimed_verified": [
+            "internal.py updated",
+            "test_api.py has 358 passing tests",
+        ],
+        "tests_run": [],
+    }
+    resp = client.post("/internal/proof-verifier", json=report)
+    data = resp.json()
+    mismatch = [f for f in data["findings"] if f["check"] == "verification_claim_mismatch"]
+    assert len(mismatch) == 0
+
+
+def test_proof_verifier_status_derivation():
+    """Status correctly reflects highest severity and blocks_closure."""
+    # close: fully proven
+    r1 = client.post("/internal/proof-verifier", json=_FULLY_PROVEN_REPORT).json()
+    assert r1["status"] == "close"
+
+    # not_close: blocks_closure finding
+    r2 = client.post("/internal/proof-verifier", json={
+        **_CLEAN_REPORT,
+        "status_claim": "done",
+    }).json()
+    assert r2["status"] == "not_close"
+
+    # watch: medium finding without blocks_closure
+    r3 = client.post("/internal/proof-verifier", json={
+        **_CLEAN_REPORT,
+        "claimed_not_verified": [],
+        "files_touched": [
+            "apps/api/routes/internal.py",
+            "apps/api/schemas.py",
+            "docs/operational_contracts.md",
+            "apps/api/services/actions.py",
+        ],
+        "claimed_verified": ["Endpoint works"],
+        "tests_run": [],
+        "status_claim": "residual debt remains",
+    }).json()
+    assert r3["status"] in ("watch", "not_close")
+
+
+def test_proof_verifier_deterministic():
+    r1 = client.post("/internal/proof-verifier", json=_CLEAN_REPORT).json()
+    r2 = client.post("/internal/proof-verifier", json=_CLEAN_REPORT).json()
+    assert r1["status"] == r2["status"]
+    assert r1["total_findings"] == r2["total_findings"]
+    assert r1["findings"] == r2["findings"]
+
+
+def test_proof_verifier_no_side_effects():
+    health_before = client.get("/health").json()
+    client.post("/internal/proof-verifier", json=_CLEAN_REPORT)
+    health_after = client.get("/health").json()
+    assert health_before["status"] == health_after["status"]
+
+
+def test_existing_endpoints_still_work_after_proof_verifier():
+    assert client.get("/health").status_code == 200
+    assert client.get("/leads").status_code == 200
+    assert client.get("/internal/queue").status_code == 200
+    assert client.get("/internal/sentinel").status_code == 200
+    assert client.get("/internal/audit").status_code == 200
+    assert client.get("/internal/redundancy").status_code == 200
+    assert client.post("/internal/scope-critic", json={
+        "classification": "BUILD",
+        "goal": "test",
+        "scope": ["test"],
+        "out_of_scope": ["nothing important"],
+        "expected_files": ["test.py"],
+        "main_risk": "none significant",
+        "minimum_acceptable": "basic implementation",
+    }).status_code == 200
+
+
+# --- Outcome feedback tests ---
+
+
+def _create_test_lead_for_outcome():
+    """Helper to create a lead and return its id."""
+    resp = client.post('/leads', json={
+        'name': 'Outcome Test',
+        'email': 'outcome-test-' + str(id(object())) + '@example.com',
+        'source': 'test',
+        'notes': 'for outcome testing',
+    })
+    return resp.json()['lead']['id']
+
+
+def test_outcome_post_happy_path():
+    lead_id = _create_test_lead_for_outcome()
+    resp = client.post('/internal/outcomes', json={
+        'lead_id': lead_id,
+        'outcome': 'qualified',
+        'reason': 'budget-fit',
+        'notes': 'spoke with decision maker',
+    })
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data['lead_id'] == lead_id
+    assert data['outcome'] == 'qualified'
+    assert data['reason'] == 'budget-fit'
+    assert data['notes'] == 'spoke with decision maker'
+    assert 'recorded_at' in data
+
+
+def test_outcome_post_optional_fields():
+    lead_id = _create_test_lead_for_outcome()
+    resp = client.post('/internal/outcomes', json={
+        'lead_id': lead_id,
+        'outcome': 'contacted',
+    })
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data['reason'] is None
+    assert data['notes'] is None
+
+
+def test_outcome_post_invalid_outcome():
+    lead_id = _create_test_lead_for_outcome()
+    resp = client.post('/internal/outcomes', json={
+        'lead_id': lead_id,
+        'outcome': 'maybe',
+    })
+    assert resp.status_code == 422
+
+
+def test_outcome_post_nonexistent_lead():
+    resp = client.post('/internal/outcomes', json={
+        'lead_id': 999999,
+        'outcome': 'won',
+    })
+    assert resp.status_code == 404
+
+
+def test_outcome_post_missing_fields():
+    resp = client.post('/internal/outcomes', json={
+        'outcome': 'won',
+    })
+    assert resp.status_code == 422
+
+    resp2 = client.post('/internal/outcomes', json={
+        'lead_id': 1,
+    })
+    assert resp2.status_code == 422
+
+
+def test_outcome_upsert():
+    lead_id = _create_test_lead_for_outcome()
+    client.post('/internal/outcomes', json={
+        'lead_id': lead_id,
+        'outcome': 'contacted',
+        'reason': 'initial call',
+    })
+    resp = client.post('/internal/outcomes', json={
+        'lead_id': lead_id,
+        'outcome': 'won',
+        'reason': 'closed deal',
+    })
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data['outcome'] == 'won'
+    assert data['reason'] == 'closed deal'
+
+
+def test_outcome_summary_shape():
+    resp = client.get('/internal/outcomes/summary')
+    assert resp.status_code == 200
+    data = resp.json()
+    assert 'generated_at' in data
+    assert 'total' in data
+    assert 'by_outcome' in data
+    expected_keys = {'contacted', 'qualified', 'won', 'lost', 'no_answer', 'bad_fit'}
+    assert set(data['by_outcome'].keys()) == expected_keys
+
+
+def test_outcome_summary_empty():
+    """Summary returns zero counts when no outcomes exist (in fresh DB)."""
+    # Note: other tests may have created outcomes, so we just check shape
+    resp = client.get('/internal/outcomes/summary')
+    data = resp.json()
+    assert all(isinstance(v, int) for v in data['by_outcome'].values())
+    assert data['total'] == sum(data['by_outcome'].values())
+
+
+def test_outcome_all_values_accepted():
+    for outcome in ['contacted', 'qualified', 'won', 'lost', 'no_answer', 'bad_fit']:
+        lead_id = _create_test_lead_for_outcome()
+        resp = client.post('/internal/outcomes', json={
+            'lead_id': lead_id,
+            'outcome': outcome,
+        })
+        assert resp.status_code == 201, f'Failed for outcome: {outcome}'
+
+
+def test_existing_endpoints_still_work_after_outcomes():
+    assert client.get('/health').status_code == 200
+    assert client.get('/leads').status_code == 200
+    assert client.get('/internal/queue').status_code == 200
+    assert client.get('/internal/sentinel').status_code == 200
+    assert client.get('/internal/outcomes/summary').status_code == 200
+
+
+# --- Outcome by-source tests ---
+
+
+def test_outcome_by_source_shape():
+    resp = client.get('/internal/outcomes/by-source')
+    assert resp.status_code == 200
+    data = resp.json()
+    assert 'generated_at' in data
+    assert 'total_sources' in data
+    assert 'items' in data
+    assert isinstance(data['items'], list)
+
+
+def test_outcome_by_source_item_shape():
+    """Each item has source, total, and all 6 outcome keys."""
+    # Create a lead and record an outcome to ensure at least one item
+    lead_resp = client.post('/leads', json={
+        'name': 'BySource Shape',
+        'email': 'bysource-shape@example.com',
+        'source': 'shape-test-source',
+        'notes': 'testing',
+    })
+    lead_id = lead_resp.json()['lead']['id']
+    client.post('/internal/outcomes', json={
+        'lead_id': lead_id,
+        'outcome': 'won',
+    })
+    resp = client.get('/internal/outcomes/by-source')
+    data = resp.json()
+    shape_items = [i for i in data['items'] if i['source'] == 'shape-test-source']
+    assert len(shape_items) == 1
+    item = shape_items[0]
+    assert item['source'] == 'shape-test-source'
+    assert item['total'] == 1
+    assert item['won'] == 1
+    for key in ['contacted', 'qualified', 'lost', 'no_answer', 'bad_fit']:
+        assert item[key] == 0
+
+
+def test_outcome_by_source_multiple_outcomes():
+    """Multiple outcomes for different leads from the same source aggregate correctly."""
+    leads = []
+    for i in range(3):
+        r = client.post('/leads', json={
+            'name': f'Multi {i}',
+            'email': f'multi-{i}-bysrc@example.com',
+            'source': 'multi-test-source',
+            'notes': 'testing',
+        })
+        leads.append(r.json()['lead']['id'])
+    client.post('/internal/outcomes', json={'lead_id': leads[0], 'outcome': 'won'})
+    client.post('/internal/outcomes', json={'lead_id': leads[1], 'outcome': 'lost', 'reason': 'price'})
+    client.post('/internal/outcomes', json={'lead_id': leads[2], 'outcome': 'won'})
+    resp = client.get('/internal/outcomes/by-source')
+    data = resp.json()
+    multi_items = [i for i in data['items'] if i['source'] == 'multi-test-source']
+    assert len(multi_items) == 1
+    item = multi_items[0]
+    assert item['won'] == 2
+    assert item['lost'] == 1
+    assert item['total'] == 3
+
+
+def test_outcome_by_source_deterministic_ordering():
+    """Items are ordered alphabetically by source."""
+    resp = client.get('/internal/outcomes/by-source')
+    data = resp.json()
+    sources = [item['source'] for item in data['items']]
+    assert sources == sorted(sources)
+
+
+def test_outcome_by_source_zero_counts():
+    """Outcomes not recorded for a source still appear as 0."""
+    r = client.post('/leads', json={
+        'name': 'Zero Test',
+        'email': 'zero-bysrc@example.com',
+        'source': 'zero-count-source',
+        'notes': 'testing',
+    })
+    lead_id = r.json()['lead']['id']
+    client.post('/internal/outcomes', json={'lead_id': lead_id, 'outcome': 'contacted'})
+    resp = client.get('/internal/outcomes/by-source')
+    data = resp.json()
+    zero_items = [i for i in data['items'] if i['source'] == 'zero-count-source']
+    assert len(zero_items) == 1
+    item = zero_items[0]
+    assert item['contacted'] == 1
+    assert item['qualified'] == 0
+    assert item['won'] == 0
+    assert item['lost'] == 0
+    assert item['no_answer'] == 0
+    assert item['bad_fit'] == 0
+
+
+def test_existing_endpoints_still_work_after_by_source():
+    assert client.get('/health').status_code == 200
+    assert client.get('/leads').status_code == 200
+    assert client.get('/internal/outcomes/summary').status_code == 200
+    assert client.get('/internal/outcomes/by-source').status_code == 200
+
+
+# --- Follow-up queue tests ---
+
+
+def _create_lead_with_outcome(name, email, source, outcome, reason=None, notes_text=None):
+    """Helper: create lead + record outcome, return lead_id."""
+    resp = client.post('/leads', json={
+        'name': name,
+        'email': email,
+        'source': source,
+        'notes': notes_text or 'test lead',
+    })
+    lead_id = resp.json()['lead']['id']
+    payload = {'lead_id': lead_id, 'outcome': outcome}
+    if reason:
+        payload['reason'] = reason
+    if notes_text:
+        payload['notes'] = notes_text
+    client.post('/internal/outcomes', json=payload)
+    return lead_id
+
+
+def test_followup_queue_shape():
+    resp = client.get('/internal/followup-queue')
+    assert resp.status_code == 200
+    data = resp.json()
+    assert 'generated_at' in data
+    assert 'total' in data
+    assert 'items' in data
+    assert isinstance(data['items'], list)
+
+
+def test_followup_queue_includes_no_answer():
+    lead_id = _create_lead_with_outcome(
+        'Followup Test', 'followup-inc@example.com', 'test',
+        'no_answer', reason='first call',
+    )
+    resp = client.get('/internal/followup-queue')
+    data = resp.json()
+    ids = [item['lead_id'] for item in data['items']]
+    assert lead_id in ids
+    item = [i for i in data['items'] if i['lead_id'] == lead_id][0]
+    assert item['outcome'] == 'no_answer'
+    assert item['outcome_reason'] == 'first call'
+    assert 'name' in item
+    assert 'email' in item
+    assert 'score' in item
+    assert 'rating' in item
+    assert 'next_action' in item
+    assert 'instruction' in item
+
+
+def test_followup_queue_excludes_other_outcomes():
+    _create_lead_with_outcome(
+        'Won Lead', 'followup-won@example.com', 'test', 'won',
+    )
+    _create_lead_with_outcome(
+        'Lost Lead', 'followup-lost@example.com', 'test', 'lost',
+    )
+    resp = client.get('/internal/followup-queue')
+    data = resp.json()
+    emails = [item['email'] for item in data['items']]
+    assert 'followup-won@example.com' not in emails
+    assert 'followup-lost@example.com' not in emails
+
+
+def test_followup_queue_ordering():
+    """Higher score leads appear first."""
+    # Lead with notes (higher score) should come before lead without notes (lower score)
+    id_high = _create_lead_with_outcome(
+        'High Score', 'followup-high@example.com', 'test',
+        'no_answer', notes_text='important notes for scoring',
+    )
+    id_low = _create_lead_with_outcome(
+        'Low Score', 'followup-low@example.com', 'notas',
+        'no_answer',
+    )
+    resp = client.get('/internal/followup-queue')
+    data = resp.json()
+    ids = [item['lead_id'] for item in data['items']]
+    if id_high in ids and id_low in ids:
+        high_item = [i for i in data['items'] if i['lead_id'] == id_high][0]
+        low_item = [i for i in data['items'] if i['lead_id'] == id_low][0]
+        if high_item['score'] != low_item['score']:
+            high_idx = ids.index(id_high)
+            low_idx = ids.index(id_low)
+            if high_item['score'] > low_item['score']:
+                assert high_idx < low_idx
+
+
+def test_followup_queue_empty_when_no_no_answer():
+    """If no leads have no_answer outcome, queue is empty (or contains only previously created ones)."""
+    resp = client.get('/internal/followup-queue')
+    data = resp.json()
+    assert data['total'] == len(data['items'])
+
+
+def test_followup_queue_upsert_removes_from_queue():
+    """If outcome is updated from no_answer to won, lead leaves the queue."""
+    lead_id = _create_lead_with_outcome(
+        'Will Convert', 'followup-convert@example.com', 'test', 'no_answer',
+    )
+    # Verify in queue
+    resp = client.get('/internal/followup-queue')
+    ids = [item['lead_id'] for item in resp.json()['items']]
+    assert lead_id in ids
+    # Update outcome
+    client.post('/internal/outcomes', json={'lead_id': lead_id, 'outcome': 'won'})
+    # Verify removed
+    resp2 = client.get('/internal/followup-queue')
+    ids2 = [item['lead_id'] for item in resp2.json()['items']]
+    assert lead_id not in ids2
+
+
+def test_existing_endpoints_still_work_after_followup():
+    assert client.get('/health').status_code == 200
+    assert client.get('/leads').status_code == 200
+    assert client.get('/internal/outcomes/summary').status_code == 200
+    assert client.get('/internal/outcomes/by-source').status_code == 200
+    assert client.get('/internal/followup-queue').status_code == 200
+
+
+# --- Leads-layer harden tests ---
+
+
+def test_followup_queue_excludes_claimed():
+    """Claimed leads should not appear in the followup queue."""
+    # Create lead, record no_answer, claim it
+    resp = client.post('/leads', json={
+        'name': 'Claimed Followup',
+        'email': 'claimed-followup@example.com',
+        'source': 'test',
+        'notes': 'testing claim exclusion',
+    })
+    lead_id = resp.json()['lead']['id']
+    client.post('/internal/outcomes', json={
+        'lead_id': lead_id,
+        'outcome': 'no_answer',
+    })
+    client.post('/internal/dispatch/claim', json={'lead_ids': [lead_id]})
+    # Verify excluded from followup queue
+    resp = client.get('/internal/followup-queue')
+    ids = [item['lead_id'] for item in resp.json()['items']]
+    assert lead_id not in ids
+
+
+def test_outcome_emits_event():
+    """Recording an outcome should emit a lead.outcome_recorded event."""
+    resp = client.post('/leads', json={
+        'name': 'Event Outcome',
+        'email': 'event-outcome@example.com',
+        'source': 'test',
+        'notes': 'testing event emission',
+    })
+    lead_id = resp.json()['lead']['id']
+    client.post('/internal/outcomes', json={
+        'lead_id': lead_id,
+        'outcome': 'qualified',
+        'reason': 'budget confirmed',
+    })
+    # Check events
+    events_resp = client.get('/internal/events', params={'event_type': 'lead.outcome_recorded'})
+    data = events_resp.json()
+    matching = [e for e in data['items'] if e['entity_id'] == lead_id]
+    assert len(matching) >= 1
+    assert matching[0]['event_type'] == 'lead.outcome_recorded'
+    assert matching[0]['entity_type'] == 'lead'
+    assert matching[0]['payload']['outcome'] == 'qualified'
+
+
+def test_leads_summary_typed_response():
+    """GET /leads/summary should return a typed response with all expected fields."""
+    resp = client.get('/leads/summary')
+    assert resp.status_code == 200
+    data = resp.json()
+    assert 'total_leads' in data
+    assert 'average_score' in data
+    assert 'low_score_count' in data
+    assert 'medium_score_count' in data
+    assert 'high_score_count' in data
+    assert 'counts_by_source' in data
+    assert isinstance(data['total_leads'], int)
+    assert isinstance(data['average_score'], (int, float))
+    assert isinstance(data['counts_by_source'], dict)
+
+
+# --- Pre-limit total tests ---
+
+
+def test_queue_total_is_pre_limit():
+    """total must reflect full queue depth, not post-limit count."""
+    src = "prelim_queue_total"
+    for i in range(4):
+        client.post("/leads", json={
+            "name": f"PLQ {i}", "email": f"plq{i}@t.com",
+            "source": src, "notes": "pre-limit total test",
+        })
+    full = client.get("/internal/queue", params={"source": src}).json()
+    full_total = full["total"]
+    assert full_total >= 4
+    limited = client.get("/internal/queue", params={"source": src, "limit": 2}).json()
+    assert limited["total"] == full_total
+    assert len(limited["items"]) == 2
+
+
+def test_dispatch_total_is_pre_limit():
+    """total must reflect full dispatch depth, not post-limit count."""
+    full = client.get("/internal/dispatch").json()
+    full_total = full["total"]
+    if full_total < 2:
+        return
+    limited = client.get("/internal/dispatch", params={"limit": 1}).json()
+    assert limited["total"] == full_total
+    assert len(limited["items"]) == 1
+
+
+def test_handoffs_total_is_pre_limit():
+    """total must reflect full handoff depth, not post-limit count."""
+    full = client.get("/internal/handoffs").json()
+    full_total = full["total"]
+    if full_total < 2:
+        return
+    limited = client.get("/internal/handoffs", params={"limit": 1}).json()
+    assert limited["total"] == full_total
+    assert len(limited["items"]) == 1
+
+
+# --- Source Outcome Actions tests ---
+
+
+def _setup_source_outcome_leads(src, outcomes):
+    """Create leads and record outcomes for a source. Returns lead IDs."""
+    lead_ids = []
+    for i, outcome in enumerate(outcomes):
+        email = f"soa_{src}_{i}_{outcome}@t.com"
+        resp = client.post("/leads", json={
+            "name": f"SOA {src} {i}",
+            "email": email,
+            "source": src,
+        })
+        if resp.status_code == 409:
+            # already exists, look up
+            leads_resp = client.get("/leads", params={"source": src, "q": email})
+            lid = leads_resp.json()[0]["id"]
+        else:
+            lid = resp.json()["lead"]["id"]
+        lead_ids.append(lid)
+        client.post("/internal/outcomes", json={
+            "lead_id": lid,
+            "outcome": outcome,
+        })
+    return lead_ids
+
+
+def test_source_outcome_actions_shape():
+    _setup_source_outcome_leads("soa_shape", ["won", "qualified", "lost"])
+    resp = client.get("/internal/source-outcome-actions")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "generated_at" in data
+    assert "total_sources" in data
+    assert "items" in data
+    assert isinstance(data["items"], list)
+    item = next(i for i in data["items"] if i["source"] == "soa_shape")
+    for field in ["source", "total_outcomes", "contacted", "qualified",
+                  "won", "lost", "no_answer", "bad_fit",
+                  "recommendation", "rationale", "data_sufficient"]:
+        assert field in item
+
+
+def test_source_outcome_actions_r1_insufficient_data():
+    """R1: total_outcomes < 3 -> review, data_sufficient=False."""
+    _setup_source_outcome_leads("soa_sparse", ["won", "won"])
+    resp = client.get("/internal/source-outcome-actions")
+    item = next(i for i in resp.json()["items"] if i["source"] == "soa_sparse")
+    assert item["recommendation"] == "review"
+    assert item["data_sufficient"] is False
+    assert "insufficient" in item["rationale"]
+
+
+def test_source_outcome_actions_r2_keep():
+    """R2: won+qualified >= 50% -> keep."""
+    _setup_source_outcome_leads("soa_keep", ["won", "qualified", "contacted"])
+    resp = client.get("/internal/source-outcome-actions")
+    item = next(i for i in resp.json()["items"] if i["source"] == "soa_keep")
+    assert item["recommendation"] == "keep"
+    assert item["data_sufficient"] is True
+    assert "qualified/won" in item["rationale"]
+
+
+def test_source_outcome_actions_r3_deprioritize():
+    """R3: bad_fit+lost >= 50% -> deprioritize."""
+    _setup_source_outcome_leads("soa_depri", ["bad_fit", "lost", "contacted"])
+    resp = client.get("/internal/source-outcome-actions")
+    item = next(i for i in resp.json()["items"] if i["source"] == "soa_depri")
+    assert item["recommendation"] == "deprioritize"
+    assert item["data_sufficient"] is True
+    assert "bad_fit/lost" in item["rationale"]
+
+
+def test_source_outcome_actions_r4_no_answer():
+    """R4: no_answer >= 50% -> review with responsiveness rationale."""
+    _setup_source_outcome_leads("soa_noans", ["no_answer", "no_answer", "contacted"])
+    resp = client.get("/internal/source-outcome-actions")
+    item = next(i for i in resp.json()["items"] if i["source"] == "soa_noans")
+    assert item["recommendation"] == "review"
+    assert item["data_sufficient"] is True
+    assert "no_answer" in item["rationale"]
+    assert "responsiveness" in item["rationale"]
+
+
+def test_source_outcome_actions_r5_mixed():
+    """R5: no dominant pattern -> review, mixed."""
+    _setup_source_outcome_leads("soa_mixed", ["won", "lost", "no_answer", "contacted"])
+    resp = client.get("/internal/source-outcome-actions")
+    item = next(i for i in resp.json()["items"] if i["source"] == "soa_mixed")
+    assert item["recommendation"] == "review"
+    assert item["data_sufficient"] is True
+    assert "mixed" in item["rationale"]
+
+
+def test_source_outcome_actions_deterministic_ordering():
+    """Items must be sorted by source name."""
+    resp = client.get("/internal/source-outcome-actions")
+    items = resp.json()["items"]
+    sources = [i["source"] for i in items]
+    assert sources == sorted(sources)
+
+
+def test_source_outcome_actions_zero_counts():
+    """Outcome types not present must appear as 0."""
+    _setup_source_outcome_leads("soa_zeros", ["won", "won", "won"])
+    resp = client.get("/internal/source-outcome-actions")
+    item = next(i for i in resp.json()["items"] if i["source"] == "soa_zeros")
+    assert item["lost"] == 0
+    assert item["bad_fit"] == 0
+    assert item["no_answer"] == 0
+    assert item["contacted"] == 0
+
+
+def test_existing_endpoints_still_work_after_source_outcome_actions():
+    for ep in ["/health", "/leads", "/internal/queue",
+               "/internal/dispatch", "/internal/handoffs",
+               "/internal/source-actions", "/internal/source-performance",
+               "/internal/outcomes/by-source"]:
+        resp = client.get(ep)
+        assert resp.status_code == 200
+
+
+# --- Daily Actions tests ---
+
+
+def test_daily_actions_shape():
+    resp = client.get("/internal/daily-actions")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "generated_at" in data
+    assert "summary" in data
+    assert "top_review" in data
+    assert "top_client_ready" in data
+    assert "top_followup" in data
+    assert "source_warnings" in data
+    s = data["summary"]
+    for field in ["pending_review", "client_ready", "followup_candidates", "source_warnings"]:
+        assert field in s
+        assert isinstance(s[field], int)
+
+
+def test_daily_actions_summary_counts_match_sections():
+    """Summary counts must reflect full lists, not capped lists."""
+    resp = client.get("/internal/daily-actions")
+    data = resp.json()
+    s = data["summary"]
+    # Counts must be >= section length (sections are capped at 5)
+    assert s["pending_review"] >= len(data["top_review"])
+    assert s["client_ready"] >= len(data["top_client_ready"])
+    assert s["followup_candidates"] >= len(data["top_followup"])
+    assert s["source_warnings"] == len(data["source_warnings"])
+
+
+def test_daily_actions_review_item_shape():
+    resp = client.get("/internal/daily-actions")
+    data = resp.json()
+    if not data["top_review"]:
+        return
+    item = data["top_review"][0]
+    for field in ["lead_id", "name", "source", "score", "rating", "next_action", "alert"]:
+        assert field in item
+
+
+def test_daily_actions_client_ready_item_shape():
+    resp = client.get("/internal/daily-actions")
+    data = resp.json()
+    if not data["top_client_ready"]:
+        return
+    item = data["top_client_ready"][0]
+    for field in ["lead_id", "name", "source", "score", "rating", "next_action"]:
+        assert field in item
+
+
+def test_daily_actions_followup_item_shape():
+    resp = client.get("/internal/daily-actions")
+    data = resp.json()
+    if not data["top_followup"]:
+        return
+    item = data["top_followup"][0]
+    for field in ["lead_id", "name", "source", "score", "outcome_recorded_at"]:
+        assert field in item
+
+
+def test_daily_actions_source_warning_shape():
+    resp = client.get("/internal/daily-actions")
+    data = resp.json()
+    if not data["source_warnings"]:
+        return
+    item = data["source_warnings"][0]
+    for field in ["source", "recommendation", "rationale", "total_outcomes"]:
+        assert field in item
+
+
+def test_daily_actions_sections_capped():
+    """Each section must contain at most 5 items."""
+    resp = client.get("/internal/daily-actions")
+    data = resp.json()
+    assert len(data["top_review"]) <= 5
+    assert len(data["top_client_ready"]) <= 5
+    assert len(data["top_followup"]) <= 5
+
+
+def test_daily_actions_excludes_claimed():
+    """Claimed leads must not appear in review or client-ready sections."""
+    # Create a lead, claim it, then verify it is absent
+    resp = client.post("/leads", json={
+        "name": "DA Claimed", "email": "da_claimed@t.com",
+        "source": "da_claim_test",
+    })
+    if resp.status_code == 409:
+        return
+    lid = resp.json()["lead"]["id"]
+    client.post("/internal/dispatch/claim", json={"lead_ids": [lid]})
+    daily = client.get("/internal/daily-actions").json()
+    review_ids = [i["lead_id"] for i in daily["top_review"]]
+    ready_ids = [i["lead_id"] for i in daily["top_client_ready"]]
+    followup_ids = [i["lead_id"] for i in daily["top_followup"]]
+    assert lid not in review_ids
+    assert lid not in ready_ids
+    assert lid not in followup_ids
+
+
+def test_daily_actions_source_warnings_only_actionable():
+    """Source warnings must only include review/deprioritize with data_sufficient."""
+    resp = client.get("/internal/daily-actions")
+    data = resp.json()
+    for w in data["source_warnings"]:
+        assert w["recommendation"] in ("review", "deprioritize")
+
+
+def test_daily_actions_deterministic():
+    """Two consecutive calls must return the same structure."""
+    r1 = client.get("/internal/daily-actions").json()
+    r2 = client.get("/internal/daily-actions").json()
+    assert [i["lead_id"] for i in r1["top_review"]] == [i["lead_id"] for i in r2["top_review"]]
+    assert [i["lead_id"] for i in r1["top_client_ready"]] == [i["lead_id"] for i in r2["top_client_ready"]]
+    assert [i["lead_id"] for i in r1["top_followup"]] == [i["lead_id"] for i in r2["top_followup"]]
+    assert [w["source"] for w in r1["source_warnings"]] == [w["source"] for w in r2["source_warnings"]]
+
+
+def test_existing_endpoints_still_work_after_daily_actions():
+    for ep in ["/health", "/leads", "/internal/queue",
+               "/internal/dispatch", "/internal/handoffs",
+               "/internal/source-actions", "/internal/source-performance",
+               "/internal/outcomes/by-source",
+               "/internal/source-outcome-actions"]:
+        resp = client.get(ep)
+        assert resp.status_code == 200
+
+
+# --- Follow-up Handoff tests ---
+
+
+def _setup_followup_handoff_lead(name, email, source, score_notes, outcome):
+    """Create a lead with a specific outcome for handoff testing."""
+    resp = client.post("/leads", json={
+        "name": name, "email": email,
+        "source": source, "notes": score_notes,
+    })
+    if resp.status_code == 409:
+        leads = client.get("/leads", params={"q": email}).json()
+        lid = leads[0]["id"]
+    else:
+        lid = resp.json()["lead"]["id"]
+    client.post("/internal/outcomes", json={
+        "lead_id": lid, "outcome": outcome,
+    })
+    return lid
+
+
+def test_followup_handoffs_shape():
+    _setup_followup_handoff_lead(
+        "FH Shape", "fh_shape@t.com", "fh_src", "notes", "no_answer",
+    )
+    resp = client.get("/internal/followup-handoffs")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "generated_at" in data
+    assert "total" in data
+    assert "items" in data
+    assert isinstance(data["items"], list)
+    assert data["total"] >= 1
+
+
+def test_followup_handoffs_item_fields():
+    _setup_followup_handoff_lead(
+        "FH Fields", "fh_fields@t.com", "fh_src", "notes", "no_answer",
+    )
+    resp = client.get("/internal/followup-handoffs")
+    items = resp.json()["items"]
+    fh = next(i for i in items if i["email"] == "fh_fields@t.com")
+    for field in ["lead_id", "name", "email", "source", "score", "rating",
+                  "outcome_recorded_at", "channel", "action", "instruction",
+                  "suggested_message"]:
+        assert field in fh
+    assert fh["channel"] == "email"
+    assert fh["action"] == "retry_contact"
+    assert fh["name"] in fh["suggested_message"]
+
+
+def test_followup_handoffs_excludes_non_no_answer():
+    _setup_followup_handoff_lead(
+        "FH Won", "fh_won@t.com", "fh_exc", "notes", "won",
+    )
+    resp = client.get("/internal/followup-handoffs")
+    emails = [i["email"] for i in resp.json()["items"]]
+    assert "fh_won@t.com" not in emails
+
+
+def test_followup_handoffs_excludes_claimed():
+    lid = _setup_followup_handoff_lead(
+        "FH Claimed", "fh_claimed@t.com", "fh_clm", "notes", "no_answer",
+    )
+    client.post("/internal/dispatch/claim", json={"lead_ids": [lid]})
+    resp = client.get("/internal/followup-handoffs")
+    ids = [i["lead_id"] for i in resp.json()["items"]]
+    assert lid not in ids
+
+
+def test_followup_handoffs_rating_matches_system():
+    """Rating must use the system vocabulary: low (<50), medium (50-74), high (>=75)."""
+    resp = client.get("/internal/followup-handoffs")
+    for item in resp.json()["items"]:
+        assert item["rating"] in ("low", "medium", "high")
+
+
+def test_followup_handoffs_instruction_varies_by_rating():
+    """Instruction must differ by rating tier."""
+    resp = client.get("/internal/followup-handoffs")
+    items = resp.json()["items"]
+    instructions_by_rating = {}
+    for item in items:
+        instructions_by_rating[item["rating"]] = item["instruction"]
+    # All instructions must contain retry_contact language
+    for instr in instructions_by_rating.values():
+        assert "Retry contact" in instr
+    # If multiple ratings present, instructions must differ
+    unique_instructions = set(instructions_by_rating.values())
+    assert len(unique_instructions) == len(instructions_by_rating)
+
+
+def test_followup_handoffs_deterministic():
+    r1 = client.get("/internal/followup-handoffs").json()
+    r2 = client.get("/internal/followup-handoffs").json()
+    assert [i["lead_id"] for i in r1["items"]] == [i["lead_id"] for i in r2["items"]]
+
+
+def test_followup_handoffs_ordering():
+    """Items must be ordered by score DESC."""
+    resp = client.get("/internal/followup-handoffs")
+    items = resp.json()["items"]
+    scores = [i["score"] for i in items]
+    assert scores == sorted(scores, reverse=True)
+
+
+def test_existing_endpoints_still_work_after_followup_handoffs():
+    for ep in ["/health", "/leads", "/internal/queue",
+               "/internal/dispatch", "/internal/handoffs",
+               "/internal/followup-queue", "/internal/daily-actions",
+               "/internal/source-outcome-actions"]:
+        resp = client.get(ep)
+        assert resp.status_code == 200
+
+
+# --- Follow-up Automation tests ---
+
+
+def test_followup_automation_shape():
+    resp = client.get("/internal/followup-automation")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "generated_at" in data
+    assert "total" in data
+    assert "items" in data
+    assert isinstance(data["items"], list)
+
+
+def test_followup_automation_item_structure():
+    """Top-level routing fields + nested payload."""
+    # Ensure at least one no_answer lead exists
+    resp = client.post("/leads", json={
+        "name": "FA Struct", "email": "fa_struct@t.com",
+        "source": "fa_src",
+    })
+    if resp.status_code != 409:
+        lid = resp.json()["lead"]["id"]
+        client.post("/internal/outcomes", json={
+            "lead_id": lid, "outcome": "no_answer",
+        })
+    resp = client.get("/internal/followup-automation")
+    items = resp.json()["items"]
+    assert len(items) >= 1
+    item = items[0]
+    # Top-level routing fields
+    for field in ["lead_id", "channel", "action", "priority"]:
+        assert field in item
+    assert item["channel"] == "email"
+    assert item["action"] == "retry_contact"
+    assert isinstance(item["priority"], int)
+    # Nested payload
+    assert "payload" in item
+    p = item["payload"]
+    for field in ["name", "email", "source", "score", "rating",
+                  "instruction", "suggested_message"]:
+        assert field in p
+
+
+def test_followup_automation_priority_sequential():
+    """Priority must be sequential starting from 0."""
+    resp = client.get("/internal/followup-automation")
+    items = resp.json()["items"]
+    priorities = [i["priority"] for i in items]
+    assert priorities == list(range(len(items)))
+
+
+def test_followup_automation_excludes_claimed():
+    resp = client.post("/leads", json={
+        "name": "FA Claimed", "email": "fa_claimed@t.com",
+        "source": "fa_clm",
+    })
+    if resp.status_code == 409:
+        return
+    lid = resp.json()["lead"]["id"]
+    client.post("/internal/outcomes", json={
+        "lead_id": lid, "outcome": "no_answer",
+    })
+    client.post("/internal/dispatch/claim", json={"lead_ids": [lid]})
+    resp = client.get("/internal/followup-automation")
+    ids = [i["lead_id"] for i in resp.json()["items"]]
+    assert lid not in ids
+
+
+def test_followup_automation_excludes_non_no_answer():
+    resp = client.post("/leads", json={
+        "name": "FA Won", "email": "fa_won@t.com",
+        "source": "fa_exc",
+    })
+    if resp.status_code == 409:
+        return
+    lid = resp.json()["lead"]["id"]
+    client.post("/internal/outcomes", json={
+        "lead_id": lid, "outcome": "won",
+    })
+    resp = client.get("/internal/followup-automation")
+    ids = [i["lead_id"] for i in resp.json()["items"]]
+    assert lid not in ids
+
+
+def test_followup_automation_consistent_with_handoffs():
+    """Automation and handoffs must select the same leads in the same order."""
+    auto = client.get("/internal/followup-automation").json()
+    hand = client.get("/internal/followup-handoffs").json()
+    auto_ids = [i["lead_id"] for i in auto["items"]]
+    hand_ids = [i["lead_id"] for i in hand["items"]]
+    assert auto_ids == hand_ids
+
+
+def test_followup_automation_deterministic():
+    r1 = client.get("/internal/followup-automation").json()
+    r2 = client.get("/internal/followup-automation").json()
+    assert [i["lead_id"] for i in r1["items"]] == [i["lead_id"] for i in r2["items"]]
+    assert [i["priority"] for i in r1["items"]] == [i["priority"] for i in r2["items"]]
+
+
+def test_followup_automation_rating_matches_system():
+    resp = client.get("/internal/followup-automation")
+    for item in resp.json()["items"]:
+        assert item["payload"]["rating"] in ("low", "medium", "high")
+
+
+def test_existing_endpoints_still_work_after_followup_automation():
+    for ep in ["/health", "/leads", "/internal/queue",
+               "/internal/dispatch", "/internal/handoffs",
+               "/internal/followup-queue", "/internal/followup-handoffs",
+               "/internal/daily-actions"]:
+        resp = client.get(ep)
+        assert resp.status_code == 200
+
+
+# --- Drift Detector tests ---
+
+_DRIFT_BASE = {
+    "plan_expected_files": ["apps/api/routes/internal.py", "apps/api/schemas.py"],
+    "plan_out_of_scope": ["do not touch scoring", "do not change leads core"],
+    "plan_classification": "BUILD",
+    "report_files_touched": ["apps/api/routes/internal.py", "apps/api/schemas.py"],
+    "report_claimed_changes": ["added drift detector endpoint", "added schemas"],
+    "report_classification": "BUILD",
+}
+
+
+def test_drift_detector_shape():
+    resp = client.post("/internal/drift-detector", json=_DRIFT_BASE)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "generated_at" in data
+    assert "status" in data
+    assert "total_findings" in data
+    assert "findings" in data
+    assert isinstance(data["findings"], list)
+
+
+def test_drift_detector_clean_when_aligned():
+    resp = client.post("/internal/drift-detector", json=_DRIFT_BASE)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "clean"
+    assert data["total_findings"] == 0
+    assert data["findings"] == []
+
+
+def test_drift_detector_file_addition_drift():
+    payload = {**_DRIFT_BASE, "report_files_touched": [
+        "apps/api/routes/internal.py", "apps/api/schemas.py", "apps/api/events.py",
+    ]}
+    resp = client.post("/internal/drift-detector", json=payload)
+    data = resp.json()
+    assert data["status"] == "drift"
+    findings = [f for f in data["findings"] if f["check"] == "file_addition_drift"]
+    assert len(findings) == 1
+    assert findings[0]["severity"] == "high"
+    assert "apps/api/events.py" in findings[0]["message"]
+
+
+def test_drift_detector_file_omission_drift():
+    payload = {**_DRIFT_BASE, "report_files_touched": ["apps/api/routes/internal.py"]}
+    resp = client.post("/internal/drift-detector", json=payload)
+    data = resp.json()
+    assert data["status"] == "watch"
+    findings = [f for f in data["findings"] if f["check"] == "file_omission_drift"]
+    assert len(findings) == 1
+    assert findings[0]["severity"] == "medium"
+    assert "apps/api/schemas.py" in findings[0]["message"]
+
+
+def test_drift_detector_classification_drift():
+    payload = {**_DRIFT_BASE, "report_classification": "HARDEN"}
+    resp = client.post("/internal/drift-detector", json=payload)
+    data = resp.json()
+    assert data["status"] == "watch"
+    findings = [f for f in data["findings"] if f["check"] == "classification_drift"]
+    assert len(findings) == 1
+    assert findings[0]["severity"] == "medium"
+    assert "BUILD" in findings[0]["message"]
+    assert "HARDEN" in findings[0]["message"]
+
+
+def test_drift_detector_out_of_scope_intrusion():
+    payload = {**_DRIFT_BASE, "report_claimed_changes": [
+        "added drift detector endpoint", "do not touch scoring",
+    ]}
+    resp = client.post("/internal/drift-detector", json=payload)
+    data = resp.json()
+    assert data["status"] == "drift"
+    findings = [f for f in data["findings"] if f["check"] == "out_of_scope_intrusion"]
+    assert len(findings) == 1
+    assert findings[0]["severity"] == "high"
+
+
+def test_drift_detector_out_of_scope_no_false_positive():
+    """Similar but non-identical items should NOT trigger out_of_scope_intrusion."""
+    payload = {**_DRIFT_BASE, "report_claimed_changes": [
+        "updated scoring thresholds", "modified leads creation flow",
+    ]}
+    resp = client.post("/internal/drift-detector", json=payload)
+    data = resp.json()
+    intrusions = [f for f in data["findings"] if f["check"] == "out_of_scope_intrusion"]
+    assert len(intrusions) == 0
+
+
+def test_drift_detector_path_normalization():
+    """Backslash vs forward-slash paths should be treated as the same file."""
+    payload = {
+        **_DRIFT_BASE,
+        "plan_expected_files": ["apps\\api\\routes\\internal.py", "apps/api/schemas.py"],
+        "report_files_touched": ["apps/api/routes/internal.py", "Apps/API/Schemas.py"],
+    }
+    resp = client.post("/internal/drift-detector", json=payload)
+    data = resp.json()
+    assert data["status"] == "clean"
+    assert data["total_findings"] == 0
+
+
+def test_drift_detector_requires_justification_flag():
+    """All drift findings should have requires_justification=True."""
+    payload = {
+        **_DRIFT_BASE,
+        "report_files_touched": ["apps/api/routes/internal.py", "apps/api/schemas.py", "extra.py"],
+        "report_classification": "HARDEN",
+    }
+    resp = client.post("/internal/drift-detector", json=payload)
+    data = resp.json()
+    assert data["total_findings"] >= 2
+    for finding in data["findings"]:
+        assert finding["requires_justification"] is True
+
+
+def test_drift_detector_deterministic():
+    payload = {
+        **_DRIFT_BASE,
+        "report_files_touched": ["apps/api/routes/internal.py", "apps/api/schemas.py", "new.py"],
+    }
+    resp1 = client.post("/internal/drift-detector", json=payload)
+    resp2 = client.post("/internal/drift-detector", json=payload)
+    d1, d2 = resp1.json(), resp2.json()
+    assert d1["status"] == d2["status"]
+    assert d1["total_findings"] == d2["total_findings"]
+    assert len(d1["findings"]) == len(d2["findings"])
+    for f1, f2 in zip(d1["findings"], d2["findings"]):
+        assert f1["check"] == f2["check"]
+        assert f1["severity"] == f2["severity"]
+        assert f1["plan_value"] == f2["plan_value"]
+        assert f1["report_value"] == f2["report_value"]

@@ -1,53 +1,124 @@
-# CLAUDE.md — apps/api
+# apps/api/CLAUDE.md
 
-> Local rules for the API module. Global CLAUDE.md applies in full.
+Purpose: keep MVP API work narrow, useful, verified.
 
----
+If a rule here does not change decisions, reduce errors, or stop drift, shorten or remove it.
+No pretty prose. Only operational value.
 
-## Scope
+## DEFAULTS
+Prefer:
+- reuse
+- smaller scope
+- fewer files
+- fewer branches
+- fewer fields
+- explicit verification
+- stopping early
 
-Owns: lead ingestion, persistence, scoring, action classification, operational outputs, reporting.
+Avoid:
+- generalization
+- future-proofing
+- hidden phase 2 work
+- polishing closed blocks
+- platform drift
 
-Must not absorb without approval: CRM behavior, delivery channel logic, automation execution, n8n integration.
+## CLASSIFY FIRST
+Before any non-trivial edit, classify as exactly one:
+- BUILD
+- HARDEN
+- BUGFIX
+- CONTRACT CLARIFICATION
+- DOC/TRUTHFULNESS
+- ALREADY DONE
+- NOT WORTH DOING NOW
 
----
+If `ALREADY DONE` or `NOT WORTH DOING NOW`, stop.
 
-## Before changing behavior
+## REVIEW FLOW
 
-Read first: `docs/leads_runbook.md`, `docs/leads_decision_log.md`, `docs/operational_contracts.md`.
+Advisory only — no enforcement hooks or CI gates exist. Claude Code follows these rules by reading this file.
 
-When docs and code disagree, code is the current contract. Do not "fix" code to match old docs without approval.
+Risk classes:
+- GREEN: 1–3 files, no persistence/dependency/protected-area/contract changes, cheap rollback
+- YELLOW: 3–6 files, internal endpoint/schema/bot changes, visible operational behavior, docs+tests+route style blocks
+- RED: persistence/schema, dependencies, protected areas (.claude/*, skills/*, deploy/*, Dockerfile, docker-compose*, README.md, .gitignore), destructive cleanup, global governance, architecture/foundation, high semantic risk
 
----
+Activation:
+- YELLOW/RED BUILD/HARDEN: run Scope Critic (`POST /internal/scope-critic`) before building
+- YELLOW/RED block closure: run Proof Verifier (`POST /internal/proof-verifier`) before closing
+- GREEN: skip unless operator asks
 
-## Invariants
+Stop:
+- Scope Critic returns `block` → do not build
+- Proof Verifier returns `not_close` → do not close
+- `watch` from either tool = proceed, but record noted concerns in the block report
+- RED blocks require operator approval before build, even if Scope Critic returns `ok` or `watch`
 
-- Unique constraint: `(email, source)`. Do not change schema without approval.
-- All ingestion converges to one internal creation path. Do not fork it. If the path does not fit, surface the gap instead of forking it.
-- Do not reimplement logic that already exists elsewhere. Call it.
+Autonomy:
+- GREEN: may build autonomously
+- YELLOW: may build if Scope Critic does not block
+- RED: must not build without operator approval
+- Never autonomously delete, archive, or make irreversible governance changes
 
----
+## CLOSED BLOCK RULE
+Do not reopen a closed block unless there is:
+- real bug
+- real contract mismatch
+- real business gain
+- real risk reduction
 
-## What counts as a contract change
+"Could be nicer" is not enough.
 
-Any of these require approval:
-- Changing response fields, types, semantics, or status codes
-- Changing what a filter matches or excludes
-- Changing result ordering
-- Any behavioral change disguised as a refactor
+## STOP IF
+- new dependency
+- persistence change
+- scoring change
+- material public contract change
+- drift toward platform / CRM / frontend productization
 
-A refactor that changes observable behavior is not a refactor.
+If any appear: stop and ask.
 
----
+## REQUIRED PRE-EDIT OUTPUT
+1. Classification
+2. Business goal
+3. Why now
+4. Smallest acceptable implementation
+5. Files to change
+6. What stays untouched
+7. Main risk
+8. Verification target
+9. Approval triggers
 
-## High-impact (triad required)
+No edits before this.
 
-Scoring, action classification, persistence schema, public endpoint contracts.
+## REQUIRED FINAL OUTPUT
+- Decision
+- Why this block exists
+- Changed
+- Verified
+- Not verified
+- Left untouched
+- Watch signals (if any)
+- Follow-up / debt
+- Approval needed [yes/no]
 
----
+## ANTI-COMPLACENCY
+Do not write casually:
+- done
+- complete
+- no debt
+- production-ready
+- fully supported
 
-## Validation
+Prefer:
+- accepted for MVP
+- intentionally deferred
+- verified at contract level
+- residual debt remains
 
-python -m pytest tests/api/test_api.py -v
-
-For changes touching contracts, ingestion, persistence, scoring, classification, or reporting behavior, verify the affected behavior explicitly, not only by assumption.
+## PROJECT TRUTH
+- External intake already exists.
+- Demo intake already exists.
+- Several internal areas are already "good enough" for MVP.
+- Prefer blocks closer to business signal.
+- Do not touch `tasks/todo.md` unless explicitly asked.
