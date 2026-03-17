@@ -1,0 +1,11 @@
+#!/bin/sh
+# OpenClaw: Regenerate codebase map after each commit.
+# Install: cp scripts/hooks/post-commit .git/hooks/post-commit && chmod +x .git/hooks/post-commit
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# Run in background so commits are not slowed down
+python "$PROJECT_ROOT/scripts/generate_map.py" > /dev/null 2>&1 &
+
+exit 0

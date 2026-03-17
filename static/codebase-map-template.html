@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenClaw — Codebase Map</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0d1117;color:#c9d1d9;overflow:hidden;height:100vh}
+
+/* ── Toolbar ─────────────────────── */
+#toolbar{position:fixed;top:0;left:0;right:0;height:48px;background:#161b22;border-bottom:1px solid #30363d;display:flex;align-items:center;padding:0 20px;z-index:100;gap:14px;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.logo{font-weight:700;font-size:15px;color:#c9d1d9;white-space:nowrap}
+.logo span{color:#58a6ff}
+#search{width:220px;padding:6px 12px;border-radius:8px;border:1px solid #30363d;background:#0d1117;color:#c9d1d9;font-size:13px;outline:none;transition:border .15s}
+#search:focus{border-color:#58a6ff;background:#161b22}
+#search::placeholder{color:#484f58}
+.sep{width:1px;height:22px;background:#30363d}
+.hint{font-size:11px;color:#484f58}
+#stats{margin-left:auto;font-size:11px;color:#484f58}
+
+/* ── Canvas ──────────────────────── */
+#canvas{position:fixed;top:48px;left:0;right:340px;bottom:0;background:#0d1117}
+#canvas svg{width:100%;height:100%}
+
+/* Dot grid background */
+.grid-pattern{fill:#0d1117}
+.grid-dot{fill:#21262d;opacity:.8}
+
+/* ── Panel ───────────────────────── */
+#panel{position:fixed;top:48px;right:0;width:340px;bottom:0;background:#161b22;border-left:1px solid #30363d;overflow-y:auto;padding:20px;font-size:13px}
+#panel h2{font-size:17px;color:#58a6ff;margin-bottom:4px;font-weight:700}
+#panel .subtitle{color:#8b949e;font-size:12px;margin-bottom:16px}
+#panel .badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600;margin-right:4px}
+#panel .section{margin-bottom:16px}
+#panel .section h3{font-size:11px;text-transform:uppercase;color:#6e7681;margin-bottom:6px;letter-spacing:.8px;font-weight:600}
+#panel .child{padding:5px 8px;font-size:12px;color:#8b949e;border-left:3px solid #30363d;margin-bottom:3px;border-radius:0 4px 4px 0;background:#0d1117;transition:background .1s}
+#panel .child:hover{background:#161b22}
+#panel .child .method{font-size:10px;font-weight:700;margin-right:5px;font-family:'SF Mono',Consolas,monospace}
+#panel .child .method.post{color:#f85149}
+#panel .child .method.get{color:#58a6ff}
+#panel .child .method.delete{color:#f85149}
+#panel .conn{padding:6px 0;border-bottom:1px solid #21262d;font-size:12px;cursor:pointer;color:#8b949e;display:flex;align-items:center;gap:6px;transition:color .1s}
+#panel .conn:hover{color:#58a6ff}
+#panel .conn .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+#panel .conn .etype{color:#6e7681;font-size:10px;margin-left:auto;text-transform:uppercase}
+#panel .empty{color:#30363d;padding:60px 0;text-align:center;font-size:14px}
+#panel .desc{color:#8b949e;font-size:12.5px;line-height:1.6;margin-bottom:16px;padding:10px 12px;background:#0d1117;border-radius:8px;border-left:3px solid #58a6ff}
+#panel .workflow{color:#8b949e;font-size:11.5px;line-height:1.5;margin-bottom:16px;padding:8px 10px;background:#1c1917;border-radius:6px;border-left:3px solid #d29922}
+#panel .workflow strong{color:#d29922}
+#panel .fn{padding:6px 8px;margin-bottom:4px;border-radius:6px;background:#0d1117;border:1px solid #30363d}
+#panel .fn-name{font-family:'SF Mono',Consolas,monospace;font-size:11.5px;color:#c9d1d9;font-weight:600}
+#panel .fn-desc{font-size:11px;color:#8b949e;margin-top:2px;line-height:1.4}
+#panel .file-link{font-size:10px;color:#6e7681;font-family:'SF Mono',Consolas,monospace;display:block;margin-top:4px}
+
+/* ── Tooltip ─────────────────────── */
+#tooltip{position:fixed;pointer-events:none;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:12px;color:#1e293b;z-index:200;display:none;box-shadow:0 4px 12px rgba(0,0,0,.1);max-width:260px}
+#tooltip .tt-sub{color:#64748b;font-size:11px}
+
+/* ── SVG elements ────────────────── */
+.node-card{cursor:pointer;transition:filter .15s,opacity .15s}
+.node-card:hover .card-bg{filter:drop-shadow(0 4px 8px rgba(0,0,0,.12))}
+.node-card.dimmed{opacity:.15}
+.node-card.highlighted .card-bg{filter:drop-shadow(0 4px 12px rgba(59,130,246,.25))}
+.edge-path{fill:none;stroke:#6e7681;stroke-width:1.5;transition:stroke .15s,stroke-opacity .15s,stroke-width .15s}
+.edge-path.dimmed{stroke-opacity:.06}
+.edge-path.highlighted{stroke:#58a6ff;stroke-width:2.5;stroke-opacity:1}
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <span class="logo">◆ Open<span>Claw</span></span>
+  <div class="sep"></div>
+  <input id="search" type="text" placeholder="Search cards..." autocomplete="off">
+  <span class="hint">Scroll to zoom · Drag to pan · Click to inspect</span>
+  <span id="stats"></span>
+</div>
+
+<div id="canvas"><svg></svg></div>
+
+<div id="panel">
+  <div class="empty">Click a card to inspect</div>
+</div>
+
+<div id="tooltip"></div>
+
+<!-- D3 -->
+<script>/*__D3_INLINE__*/</script>
+<!-- Dagre -->
+<script>/*__DAGRE_INLINE__*/</script>
+
+<script>
+function boot(){
+  if(typeof d3==="undefined"){var s=document.createElement("script");s.src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js";s.onload=boot;document.head.appendChild(s);return}
+  if(typeof dagre==="undefined"){var s=document.createElement("script");s.src="https://cdn.jsdelivr.net/npm/@dagrejs/dagre@1.1.4/dist/dagre.min.js";s.onload=boot;document.head.appendChild(s);return}
+  initGraph();
+}
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot);else boot();
+
+function initGraph(){
+
+const RAW=/*__GRAPH_DATA__*/{"nodes":[],"edges":[],"groups":{},"meta":{}};
+const groupNodes={};
+RAW.nodes.forEach(n=>{const g=n.group||"other";if(!groupNodes[g])groupNodes[g]=[];groupNodes[g].push(n)});
+
+// ── Workflow Cards ────────────────────────────────────
+const CATEGORY={
+  source:  {color:"#f59e0b",bg:"#1c1704",border:"#854d0e"},
+  app:     {color:"#58a6ff",bg:"#0c1929",border:"#1f4b8c"},
+  route:   {color:"#388bfd",bg:"#0c1929",border:"#1f4b8c"},
+  service: {color:"#3bc9db",bg:"#042f2e",border:"#115e59"},
+  data:    {color:"#a78bfa",bg:"#1a1033",border:"#4c1d95"},
+  output:  {color:"#c084fc",bg:"#1e1033",border:"#581c87"},
+  govern:  {color:"#4ade80",bg:"#052e16",border:"#166534"},
+};
+
+const CARDS=[
+  // ── SOURCES ──
+  {id:"ext:n8n", label:"n8n", sub:"Automation polling", icon:"⚡", cat:"source",
+   desc:"n8n is the external automation platform that consumes OpenClaw's API. It polls endpoints like /internal/queue to get new leads, fetches lead packs, generates daily summaries, and triggers notification workflows. n8n never duplicates OpenClaw logic — it only reads and reacts.",
+   workflow:"This is where the automated pipeline begins. n8n polls the Internal API for new actionable leads, then routes them through notification and CRM workflows externally.",
+   functions:[
+    {name:"GET /internal/queue",desc:"Main polling endpoint — n8n checks this for new prioritized leads"},
+    {name:"GET /leads/{id}/pack",desc:"Fetches full lead details for notification messages"},
+    {name:"GET /leads/summary",desc:"Daily stats used for automated summary reports"},
+    {name:"GET /leads/export.csv",desc:"Weekly backup export trigger"},
+   ]},
+
+  {id:"ext:webhooks", label:"Webhooks", sub:"Inbound providers", icon:"🔗", cat:"source",
+   desc:"External webhook providers (landing pages, form tools, third-party CRMs) push lead data into OpenClaw via POST /leads/webhook/{provider}. Each provider gets a unique URL. The source is automatically set to 'webhook:{provider}'.",
+   workflow:"Webhook data arrives → validated → normalized (email lowercase, name trimmed) → deduplicated by (email, source) → scored → persisted.",
+   functions:[
+    {name:"POST /leads/webhook/{provider}",desc:"Single lead intake from any webhook provider"},
+    {name:"POST /leads/webhook/{provider}/batch",desc:"Batch intake — multiple leads in one call, same provider"},
+   ]},
+
+  {id:"ext:forms", label:"External Forms", sub:"Landing pages", icon:"📋", cat:"source",
+   desc:"Landing pages and external forms (like the Sentyacht boat sales site) submit leads via the canonical external adapter. Supports phone numbers and custom metadata that gets serialized into the notes field as @ext: JSON.",
+   workflow:"Form submit → POST /leads/external → validates source format (must be type:identifier) → serializes phone + metadata → creates lead → returns score and status.",
+   functions:[
+    {name:"POST /leads/external",desc:"Canonical external adapter — accepts name, email, source, phone, metadata"},
+   ]},
+
+  // ── APP ──
+  {id:"app:main", label:"FastAPI App", sub:"Entry point · main.py", icon:"◆", cat:"app",
+   desc:"The FastAPI application factory. Initializes the database on startup via a lifespan context manager, then mounts all route modules (health, leads, internal, demo). This is the single entry point for the entire API.",
+   workflow:"App starts → init_db() creates SQLite tables if missing → mounts all routers → uvicorn serves on port 8000.",
+   file:"apps/api/main.py",
+   functions:[
+    {name:"create_app()",desc:"Application factory — lifespan manager initializes DB, includes all routers"},
+    {name:"init_db()",desc:"Creates leads, dispatch_claims, events, and lead_outcomes tables"},
+   ]},
+
+  // ── ROUTES ──
+  {id:"grp:health", label:"Health", sub:"3 endpoints", icon:"💚", cat:"route", group:"health_routes",
+   desc:"Health check and discovery endpoints. Used by monitoring systems (uptime checks) and by n8n to verify the API is alive. Also provides a route listing endpoint for API discovery.",
+   workflow:"External monitor or n8n → GET /health → returns status + environment. GET /health/detail also checks DB connectivity.",
+   file:"apps/api/routes/health.py"},
+
+  {id:"grp:leads", label:"Lead Routes", sub:"19 endpoints", icon:"📥", cat:"route", group:"leads_routes",
+   desc:"The core lead management module. Handles lead creation (single, bulk, webhook, external), querying with filters, lead pack generation (rating + summary + rendering), and actionable lead surfaces. This is where leads enter the system and get enriched with scoring, actions, and delivery data.",
+   workflow:"Lead arrives (POST) → normalize email/name → check dedup (email+source) → calculate_lead_score() → determine_next_action() → persist to DB → emit lead.created event → return result with score.",
+   file:"apps/api/routes/leads.py",
+   functions:[
+    {name:"POST /leads",desc:"Create a single lead — the main intake endpoint"},
+    {name:"POST /leads/ingest",desc:"Bulk creation — array of leads in one call"},
+    {name:"GET /leads",desc:"List leads with filters: source, min_score, q (search), date range, pagination"},
+    {name:"GET /leads/actionable",desc:"Leads requiring action (score ≥ 40 or has user notes)"},
+    {name:"GET /leads/actionable/worklist",desc:"Same leads but grouped by next_action with priority ordering"},
+    {name:"GET /leads/{id}/pack",desc:"Rich lead view: rating + summary + next_action + alert flag"},
+    {name:"GET /leads/{id}/delivery",desc:"Delivery wrapper with dynamic message and top-level alert/action"},
+    {name:"GET /leads/export.csv",desc:"CSV export with injection protection (prefixes dangerous chars)"},
+   ]},
+
+  {id:"grp:internal", label:"Internal API", sub:"30+ endpoints", icon:"⚙️", cat:"route", group:"internal_routes",
+   desc:"The operational backbone. Provides dispatch queues, claim management, handoff surfaces, review workflows, operator dashboards, source intelligence, outcome tracking, followup automation, daily digests, and governance endpoints (sentinel, audit, redundancy checks, scope critic, proof verifier, drift detector).",
+   workflow:"Operator or n8n → polls queue/dispatch → claims leads for processing → works them → records outcomes → system generates followup candidates and daily action digest.",
+   file:"apps/api/routes/internal.py",
+   functions:[
+    {name:"GET /internal/queue",desc:"Prioritized lead queue — sorted by alert, action priority, score"},
+    {name:"GET /internal/dispatch",desc:"Automation-ready batch — excludes claimed leads, includes full lead pack"},
+    {name:"POST /internal/dispatch/claim",desc:"Claim leads for processing — prevents double-dispatch"},
+    {name:"DELETE /internal/dispatch/claim/{id}",desc:"Release a claimed lead back to the queue"},
+    {name:"GET /internal/handoffs",desc:"Outbound handoff surface — maps actions to channels (email, review, manual)"},
+    {name:"GET /internal/review",desc:"Client review queue — only send_to_client + review_manually leads"},
+    {name:"GET /internal/ops/snapshot",desc:"Daily operational snapshot — total, actionable, claimed, urgent counts"},
+    {name:"GET /internal/worklist",desc:"Operator dashboard — combines pending_review + client_ready + recently_claimed"},
+    {name:"POST /internal/outcomes",desc:"Record lead outcome (contacted, qualified, won, lost, no_answer, bad_fit)"},
+    {name:"GET /internal/daily-actions",desc:"Compact daily digest — top 5 review, client-ready, followup, source warnings"},
+    {name:"GET /internal/sentinel",desc:"Operational health check — deterministic, read-only, no side effects"},
+    {name:"GET /internal/audit",desc:"Cross-module consistency check"},
+   ]},
+
+  {id:"grp:demo", label:"Demo", sub:"Intake form", icon:"🖥️", cat:"route", group:"demo_routes",
+   desc:"Demo HTML form for testing lead intake. Includes anti-indexing meta tags (noindex, nofollow), anti-caching headers, and visible 'Internal demo only' markers. Not a production surface.",
+   workflow:"Browser → GET /demo/intake → renders HTML form → submit → POST /leads → shows result.",
+   file:"apps/api/routes/demo.py"},
+
+  // ── SERVICES ──
+  {id:"svc:scoring", label:"Scoring", sub:"calculate_lead_score()", icon:"🎯", cat:"service", group:"scoring_service",
+   desc:"Calculates a numeric score (0–100) for each lead. Currently a placeholder: base score 50, +10 if notes contain real user text (not @ext: metadata). Real scoring logic is deferred (frozen decision F7). The score drives all downstream decisions.",
+   workflow:"Lead created → scoring called → base 50 + user notes bonus → score stored in DB → used by actions, rating, queue ordering, and alert logic.",
+   file:"apps/api/services/scoring.py",
+   functions:[
+    {name:"calculate_lead_score(source, notes)",desc:"Returns 0–100 score. Base 50, +10 for real user notes. Capped at 100."},
+    {name:"_has_user_notes(notes)",desc:"Helper — detects real user content vs @ext: metadata lines"},
+   ]},
+
+  {id:"svc:actions", label:"Actions", sub:"determine_next_action()", icon:"▶", cat:"service", group:"actions_service",
+   desc:"Determines what should happen next with a lead based on its score and notes. Returns one of: send_to_client, review_manually, request_more_info, enrich_first, or discard. Also provides human-readable instructions and alert flags.",
+   workflow:"Score + notes → action decision → instruction text → alert flag (score ≥ 60) → returned to routes for queue ordering and operator guidance.",
+   file:"apps/api/services/actions.py",
+   functions:[
+    {name:"determine_next_action(score, notes)",desc:"Score ≥ 60 → send_to_client · ≥ 40 + notes → review_manually · ≥ 40 no notes → request_more_info · < 40 + notes → enrich_first · else → discard"},
+    {name:"should_alert(score)",desc:"Returns true if score ≥ 60 — triggers urgent handling"},
+    {name:"get_instruction(action)",desc:"Returns human-readable instruction text for an action (e.g. 'Forward to client immediately')"},
+   ]},
+
+  {id:"svc:leadpack", label:"Lead Pack", sub:"rating · summary", icon:"📦", cat:"service", group:"leadpack_service",
+   desc:"Generates the rich lead representation. Computes a rating label (low/medium/high), builds a human-readable summary, and renders lead packs as HTML or plain text for email notifications and reports.",
+   workflow:"Score → get_rating() → build_summary() → optionally render as HTML/text → used in delivery, handoffs, and n8n notifications.",
+   file:"apps/api/services/leadpack.py",
+   functions:[
+    {name:"get_rating(score)",desc:"< 50 → low · 50–74 → medium · ≥ 75 → high"},
+    {name:"build_summary(name, source, score, rating)",desc:"Human-readable: '{name} from {source} — score {score} ({rating})'"},
+    {name:"render_lead_pack_html(...)",desc:"Safe HTML rendering with escaped user data for email"},
+    {name:"render_lead_pack_text(...)",desc:"Plain text variant for SMS/simple notifications"},
+   ]},
+
+  // ── DATA ──
+  {id:"data:db", label:"Database", sub:"SQLite · 4 tables", icon:"🗄️", cat:"data", group:"database",
+   desc:"SQLite database with 4 tables. Leads table has a UNIQUE index on (email, source) for atomic deduplication. Dispatch_claims tracks which leads are claimed for processing. Events stores an audit trail. Lead_outcomes records real-world results.",
+   workflow:"All writes go through parameterized SQL (never interpolated). Connection is a lazy singleton. Schema created at app startup via init_db().",
+   file:"apps/api/db.py",
+   functions:[
+    {name:"leads",desc:"Core table — id, name, email, source, notes, score, created_at. UNIQUE(email, source)"},
+    {name:"dispatch_claims",desc:"Tracks claimed leads — prevents double-dispatch. UNIQUE(lead_id)"},
+    {name:"events",desc:"Audit trail — event_type, entity_type, entity_id, origin_module, payload JSON"},
+    {name:"lead_outcomes",desc:"Real-world results — outcome (won/lost/contacted/...), reason, notes"},
+   ]},
+
+  {id:"data:schemas", label:"Schemas", sub:"60+ Pydantic models", icon:"📐", cat:"data", group:"schemas",
+   desc:"Pydantic models for all request/response validation. Covers lead creation, lead packs, operational queues, worklists, automation dispatch, handoffs, outcomes, source intelligence, governance endpoints, and more. All input validation happens at API boundaries.",
+   workflow:"Request arrives → Pydantic validates input → handler processes → Pydantic serializes response. No invalid data reaches business logic.",
+   file:"apps/api/schemas.py"},
+
+  // ── OUTPUTS ──
+  {id:"out:dispatch", label:"Dispatch", sub:"Claim & release", icon:"📤", cat:"output",
+   desc:"The automation dispatch surface. Provides machine-ready lead batches with action, instruction, priority, and full lead pack payload. Supports claiming (to prevent double-processing) and releasing leads.",
+   workflow:"n8n polls GET /internal/dispatch → gets unclaimed leads → POST /internal/dispatch/claim to lock them → processes externally → DELETE claim when done."},
+
+  {id:"out:handoff", label:"Handoffs", sub:"Channel routing", icon:"🤝", cat:"output",
+   desc:"Maps each lead's next_action to an outbound channel: send_to_client → email, review_manually → review queue, request_more_info → email, enrich_first → manual. Provides formatted instructions and supports CSV export for batch processing.",
+   workflow:"Internal API builds handoff items → each gets a channel + instruction + lead data → n8n or operator routes to the right channel."},
+
+  {id:"out:outcomes", label:"Outcomes", sub:"Track results", icon:"📊", cat:"output",
+   desc:"Records what actually happened with each lead (contacted, qualified, won, lost, no_answer, bad_fit). Upsert semantics — one outcome per lead. Provides aggregates per source, outcome-aware source recommendations, and followup queues for no_answer leads.",
+   workflow:"Operator records outcome → POST /internal/outcomes → stored in lead_outcomes → feeds source intelligence and followup automation."},
+
+  {id:"out:daily", label:"Daily Digest", sub:"Action summary", icon:"📅", cat:"output",
+   desc:"Compact daily action surface showing the top 5 leads in each category: needs review, client-ready, followup candidates, plus source warnings (up to 3). Summary counts reflect pre-cap totals. Designed for a morning briefing.",
+   workflow:"GET /internal/daily-actions → aggregates across all leads → returns top-5 per category + source health warnings."},
+
+  // ── GOVERNANCE ──
+  {id:"gov:rules", label:"Governance", sub:"14 rules · CLAUDE.md", icon:"📜", cat:"govern", group:"governance",
+   desc:"The global operating rules for Claude Code in this repository. 14 sections covering: project posture (MVP first), non-negotiable rules (inspect before claiming, no scope creep), operator/mode system (BUILD vs HARDEN), planning discipline, context management, approval boundaries, high-impact triad, verification standards, and definition of done.",
+   workflow:"Before any task → read CLAUDE.md → declare MODE (BUILD/HARDEN) → plan → execute → verify → report. Protected files cannot be touched without approval.",
+   file:".claude/CLAUDE.md",
+   functions:[
+    {name:"§2 Non-negotiable rules",desc:"Inspect before claiming · no invented completeness · no silent scope expansion · surface tradeoffs"},
+    {name:"§3 Operator & Mode",desc:"BUILD = new features · HARDEN = fixes/hardening · must declare before non-trivial work"},
+    {name:"§10 Approval boundaries",desc:"Must ask before: new deps, schema changes, scoring logic, auth, deployment, protected files"},
+    {name:"§12 Verification",desc:"Never claim unchecked results. State exact command used. Report: Changed/Verified/Not verified/Left untouched/Follow-up"},
+   ]},
+
+  {id:"gov:skills", label:"Skills", sub:"17 agents", icon:"🤖", cat:"govern", group:"skills",
+   desc:"Specialized Claude Code agents that activate on specific patterns. Architecture guardian prevents over-engineering. Regression sentinel catches blast radius. Auto test generator proposes minimal tests. Scope guard protects against scope creep. Block executor manages phased implementation.",
+   workflow:"Task context triggers a skill → skill provides guardrails → implementation follows skill constraints → skill validates output.",
+   functions:[
+    {name:"architecture_guardian",desc:"Prevents scope creep, premature abstraction, and out-of-scope changes"},
+    {name:"regression_sentinel",desc:"Identifies blast radius of changes, runs relevant tests"},
+    {name:"auto_test_generator",desc:"Proposes minimal tests: happy path + failure path + edge case"},
+    {name:"scope-guard",desc:"Protects current block from scope drift and silent reinterpretation"},
+    {name:"block-executor",desc:"Manages medium/large implementation blocks in disciplined phases"},
+    {name:"sandbox-gate",desc:"Requires isolated validation before accepting block as complete"},
+   ]},
+
+  {id:"gov:modrules", label:"Module Rules", sub:"automations · core", icon:"📏", cat:"govern", group:"module_rules",
+   desc:"Module-local CLAUDE.md files that add stricter rules within their scope. The automations module enforces: no business logic duplication, no re-filtering, no persistence, no new dependencies. The core module is a stub for future shared primitives.",
+   workflow:"When working on a specific module → read its local CLAUDE.md first → follow module-specific rules in addition to global rules."},
+
+  {id:"gov:tasks", label:"Task Tracking", sub:"todo · lessons", icon:"✅", cat:"govern", group:"tasks",
+   desc:"Persistent task management files. todo.md tracks the active task with checkable steps and review sections. lessons.md stores repeated mistakes and corrective patterns to prevent re-learning the same lesson across sessions.",
+   workflow:"Start session → read todo.md for active work → read lessons.md for relevant patterns → work → update todo.md → capture new lessons if needed.",
+   functions:[
+    {name:"tasks/todo.md",desc:"Active task plan with checkable steps, progress tracking, and post-task review"},
+    {name:"tasks/lessons.md",desc:"Recurring mistake patterns with root cause, corrective rule, and detection method"},
+   ]},
+];
+
+// Fill child counts
+CARDS.forEach(c=>{
+  if(c.group&&groupNodes[c.group]){
+    c.children=groupNodes[c.group];
+    const n=c.children.length;
+    if(c.group.endsWith("_routes"))c.sub=`${n} endpoints`;
+    else if(c.group==="schemas")c.sub=`${n} models`;
+    else if(c.group==="skills")c.sub=`${n} agents`;
+    else if(c.group==="database")c.sub=`${n} tables`;
+    else if(c.group==="governance")c.sub=`${n} rules`;
+  }
+});
+
+// Pipeline connections (clean, minimal — one line per step)
+const CONNS=[
+  {from:"ext:n8n",     to:"grp:leads"},
+  {from:"ext:webhooks",to:"grp:leads"},
+  {from:"ext:forms",   to:"grp:leads"},
+  {from:"app:main",    to:"grp:health"},
+  {from:"app:main",    to:"grp:leads"},
+  {from:"app:main",    to:"grp:internal"},
+  {from:"app:main",    to:"grp:demo"},
+  {from:"grp:leads",   to:"svc:scoring"},
+  {from:"grp:leads",   to:"svc:actions"},
+  {from:"grp:internal",to:"svc:leadpack"},
+  {from:"svc:scoring", to:"data:db"},
+  {from:"svc:actions", to:"data:db"},
+  {from:"svc:leadpack",to:"data:db"},
+  {from:"grp:internal",to:"out:dispatch"},
+  {from:"grp:internal",to:"out:handoff"},
+  {from:"grp:internal",to:"out:outcomes"},
+  {from:"grp:internal",to:"out:daily"},
+  {from:"gov:rules",   to:"app:main"},
+];
+
+const cardMap=new Map(CARDS.map(c=>[c.id,c]));
+
+document.getElementById("stats").textContent=
+  `${RAW.nodes.length} nodes · ${CARDS.length} cards · ${RAW.meta.generated_at?new Date(RAW.meta.generated_at).toLocaleString():""}`;
+
+// ── Dagre Layout ──────────────────────────────────────
+const NODE_W=220,NODE_H=56;
+
+const dg=new dagre.graphlib.Graph();
+dg.setGraph({rankdir:"LR",nodesep:35,ranksep:90,edgesep:20,marginx:50,marginy:50,ranker:"network-simplex"});
+dg.setDefaultEdgeLabel(()=>({}));
+
+CARDS.forEach(c=>dg.setNode(c.id,{width:NODE_W,height:NODE_H}));
+CONNS.forEach(c=>{if(cardMap.has(c.from)&&cardMap.has(c.to))dg.setEdge(c.from,c.to)});
+
+dagre.layout(dg);
+
+// Read computed positions
+CARDS.forEach(c=>{const n=dg.node(c.id);c.x=n.x-NODE_W/2;c.y=n.y-NODE_H/2;c.cx=n.x;c.cy=n.y});
+
+// ── SVG Setup ─────────────────────────────────────────
+const container=document.getElementById("canvas");
+const W=container.clientWidth,H=container.clientHeight;
+const svg=d3.select("#canvas svg");
+
+// Dot grid pattern
+const defs=svg.append("defs");
+const pat=defs.append("pattern").attr("id","dotgrid").attr("width",20).attr("height",20).attr("patternUnits","userSpaceOnUse");
+pat.append("rect").attr("width",20).attr("height",20).attr("class","grid-pattern");
+pat.append("circle").attr("cx",10).attr("cy",10).attr("r",.8).attr("class","grid-dot");
+svg.append("rect").attr("width","100%").attr("height","100%").attr("fill","url(#dotgrid)");
+
+// Arrowhead
+defs.append("marker").attr("id","arrow").attr("viewBox","0 0 10 10").attr("refX",9).attr("refY",5)
+  .attr("markerWidth",7).attr("markerHeight",7).attr("orient","auto")
+  .append("path").attr("d","M0,1 L10,5 L0,9 Z").attr("fill","#6e7681");
+
+defs.append("marker").attr("id","arrow-hl").attr("viewBox","0 0 10 10").attr("refX",9).attr("refY",5)
+  .attr("markerWidth",7).attr("markerHeight",7).attr("orient","auto")
+  .append("path").attr("d","M0,1 L10,5 L0,9 Z").attr("fill","#58a6ff");
+
+// Drop shadow filter
+defs.append("filter").attr("id","shadow").attr("x","-5%").attr("y","-5%").attr("width","115%").attr("height","125%")
+  .html('<feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity=".4"/>');
+
+const root=svg.append("g");
+const zoom=d3.zoom().scaleExtent([.25,3]).on("zoom",e=>root.attr("transform",e.transform));
+svg.call(zoom);
+
+// ── Draw Edges (behind nodes) ─────────────────────────
+const lineGen=d3.line().x(d=>d.x).y(d=>d.y).curve(d3.curveBasis);
+
+const edgeG=root.append("g");
+const edgeEls=edgeG.selectAll("path")
+  .data(CONNS.filter(c=>cardMap.has(c.from)&&cardMap.has(c.to)))
+  .join("path")
+  .attr("class","edge-path")
+  .attr("d",c=>{
+    const e=dg.edge(c.from,c.to);
+    return e?lineGen(e.points):"";
+  })
+  .attr("marker-end","url(#arrow)");
+
+// ── Draw Cards ────────────────────────────────────────
+const cardG=root.append("g");
+const cardEls=cardG.selectAll("g")
+  .data(CARDS)
+  .join("g")
+  .attr("class","node-card")
+  .attr("transform",c=>`translate(${c.x},${c.y})`);
+
+// Card background
+cardEls.append("rect").attr("class","card-bg")
+  .attr("width",NODE_W).attr("height",NODE_H).attr("rx",10).attr("ry",10)
+  .attr("fill",c=>CATEGORY[c.cat].bg)
+  .attr("stroke",c=>CATEGORY[c.cat].border)
+  .attr("stroke-width",1.5)
+  .attr("filter","url(#shadow)");
+
+// Left accent stripe
+cardEls.append("rect")
+  .attr("x",0).attr("y",8).attr("width",4).attr("height",NODE_H-16).attr("rx",2)
+  .attr("fill",c=>CATEGORY[c.cat].color);
+
+// Icon
+cardEls.append("text")
+  .attr("x",18).attr("y",NODE_H/2+1)
+  .attr("font-size","16px").attr("text-anchor","middle").attr("dominant-baseline","central")
+  .text(c=>c.icon);
+
+// Title
+cardEls.append("text")
+  .attr("x",32).attr("y",22).attr("font-size","13px").attr("font-weight","600").attr("fill","#c9d1d9")
+  .text(c=>c.label);
+
+// Subtitle
+cardEls.append("text")
+  .attr("x",32).attr("y",38).attr("font-size","10.5px").attr("fill","#8b949e")
+  .text(c=>{const s=c.sub;return s.length>26?s.slice(0,24)+"…":s});
+
+// Count badge
+cardEls.filter(c=>c.children&&c.children.length)
+  .append("rect")
+  .attr("x",NODE_W-30).attr("y",8).attr("width",22).attr("height",16).attr("rx",8)
+  .attr("fill",c=>CATEGORY[c.cat].color).attr("fill-opacity",.15);
+cardEls.filter(c=>c.children&&c.children.length)
+  .append("text")
+  .attr("x",NODE_W-19).attr("y",19).attr("text-anchor","middle").attr("font-size","10px").attr("font-weight","700")
+  .attr("fill",c=>CATEGORY[c.cat].color)
+  .text(c=>c.children.length);
+
+// ── Interactions ──────────────────────────────────────
+let selId=null;
+
+cardEls.on("click",(ev,c)=>{
+  ev.stopPropagation();
+  if(selId===c.id){selId=null;clearSel();return}
+  selId=c.id;showPanel(c);hl(c);
+});
+svg.on("click",()=>{selId=null;clearSel()});
+
+const tooltip=document.getElementById("tooltip");
+cardEls
+  .on("mouseenter",(ev,c)=>{
+    if(selId)return;hl(c);
+    tooltip.innerHTML=`<strong>${esc(c.label)}</strong><div class="tt-sub">${esc(c.sub)}</div>`;
+    tooltip.style.display="block";
+  })
+  .on("mousemove",ev=>{tooltip.style.left=(ev.clientX+14)+"px";tooltip.style.top=(ev.clientY-10)+"px"})
+  .on("mouseleave",()=>{if(selId)return;clrHL();tooltip.style.display="none"});
+
+function hl(c){
+  const s=new Set([c.id]);
+  CONNS.forEach(e=>{if(e.from===c.id||e.to===c.id){s.add(e.from);s.add(e.to)}});
+  cardEls.classed("dimmed",d=>!s.has(d.id)).classed("highlighted",d=>s.has(d.id));
+  edgeEls.classed("dimmed",e=>!(s.has(e.from)&&s.has(e.to)))
+         .classed("highlighted",e=>s.has(e.from)&&s.has(e.to));
+  edgeEls.attr("marker-end",e=>s.has(e.from)&&s.has(e.to)?"url(#arrow-hl)":"url(#arrow)");
+}
+function clrHL(){
+  cardEls.classed("dimmed",false).classed("highlighted",false);
+  edgeEls.classed("dimmed",false).classed("highlighted",false).attr("marker-end","url(#arrow)");
+}
+function clearSel(){document.getElementById("panel").innerHTML='<div class="empty">Click a card to inspect</div>';clrHL()}
+
+// ── Panel ─────────────────────────────────────────────
+function showPanel(c){
+  const p=document.getElementById("panel");
+  const cat=CATEGORY[c.cat];
+  const outC=CONNS.filter(e=>e.from===c.id);
+  const inC=CONNS.filter(e=>e.to===c.id);
+
+  let h=`<h2>${esc(c.label)}</h2>`;
+  h+=`<div class="subtitle"><span class="badge" style="background:${cat.bg};color:${cat.color};border:1px solid ${cat.border}">${c.cat}</span> ${esc(c.sub)}</div>`;
+
+  // Description
+  if(c.desc) h+=`<div class="desc">${esc(c.desc)}</div>`;
+
+  // Workflow context
+  if(c.workflow) h+=`<div class="workflow"><strong>Workflow:</strong> ${esc(c.workflow)}</div>`;
+
+  // File reference
+  if(c.file) h+=`<span class="file-link">📁 ${esc(c.file)}</span><br><br>`;
+
+  // Functions / key items
+  if(c.functions&&c.functions.length){
+    h+=`<div class="section"><h3>Key Functions</h3>`;
+    c.functions.forEach(f=>{
+      h+=`<div class="fn"><div class="fn-name">${esc(f.name)}</div><div class="fn-desc">${esc(f.desc)}</div></div>`;
+    });
+    h+=`</div>`;
+  }
+
+  // Children (endpoints, tables, etc.)
+  if(c.children&&c.children.length){
+    h+=`<div class="section"><h3>All Contents (${c.children.length})</h3>`;
+    c.children.forEach(ch=>{
+      if(ch.type==="route"){
+        const m=(ch.details&&ch.details.method)||"";
+        const mc=m==="POST"||m==="DELETE"?"post":"get";
+        h+=`<div class="child"><span class="method ${mc}">${m}</span>${esc(ch.label.replace(m+" ",""))}</div>`;
+      }else if(ch.type==="function"){
+        h+=`<div class="child" style="border-color:${cat.color}">ƒ ${esc(ch.label)}</div>`;
+      }else if(ch.type==="table"){
+        const cols=ch.details&&ch.details.columns?ch.details.columns.join(", "):"";
+        h+=`<div class="child" style="border-color:${cat.color}">⊞ <strong>${esc(ch.label)}</strong>${cols?" — "+esc(cols):""}</div>`;
+      }else if(ch.type==="skill"){
+        h+=`<div class="child" style="border-color:${cat.color}">🤖 ${esc(ch.label)}</div>`;
+      }else if(ch.type==="governance"){
+        h+=`<div class="child" style="border-color:${cat.color}">§ ${esc(ch.label)}</div>`;
+      }else{
+        h+=`<div class="child">${esc(ch.label)}</div>`;
+      }
+    });
+    h+=`</div>`;
+  }
+
+  // Connections
+  if(outC.length){
+    h+=`<div class="section"><h3>Connects to</h3>`;
+    outC.forEach(e=>{const t=cardMap.get(e.to);if(t){const tc=CATEGORY[t.cat];
+      h+=`<div class="conn" data-id="${escA(e.to)}"><div class="dot" style="background:${tc.color}"></div>${esc(t.label)}<span class="etype">→</span></div>`}});
+    h+=`</div>`;
+  }
+  if(inC.length){
+    h+=`<div class="section"><h3>Receives from</h3>`;
+    inC.forEach(e=>{const s=cardMap.get(e.from);if(s){const sc=CATEGORY[s.cat];
+      h+=`<div class="conn" data-id="${escA(e.from)}"><div class="dot" style="background:${sc.color}"></div>${esc(s.label)}<span class="etype">←</span></div>`}});
+    h+=`</div>`;
+  }
+
+  p.innerHTML=h;
+  p.querySelectorAll(".conn[data-id]").forEach(el=>{
+    el.addEventListener("click",()=>{
+      const tid=el.getAttribute("data-id");const tc=CARDS.find(x=>x.id===tid);
+      if(tc){selId=tid;showPanel(tc);hl(tc);centerOn(tc)}
+    });
+  });
+}
+
+// ── Search ────────────────────────────────────────────
+const searchEl=document.getElementById("search");
+searchEl.addEventListener("input",()=>{
+  const q=searchEl.value.trim().toLowerCase();
+  if(!q){clrHL();return}
+  const hits=new Set();
+  CARDS.forEach(c=>{
+    if(c.label.toLowerCase().includes(q)||c.sub.toLowerCase().includes(q))hits.add(c.id);
+    if(c.children)c.children.forEach(ch=>{if(ch.label.toLowerCase().includes(q))hits.add(c.id)});
+  });
+  if(!hits.size){cardEls.classed("dimmed",true);edgeEls.classed("dimmed",true);return}
+  cardEls.classed("dimmed",d=>!hits.has(d.id)).classed("highlighted",d=>hits.has(d.id));
+  edgeEls.classed("dimmed",true);
+});
+searchEl.addEventListener("keydown",e=>{
+  if(e.key==="Enter"){const q=searchEl.value.trim().toLowerCase();
+    const m=CARDS.find(c=>c.label.toLowerCase().includes(q)||c.sub.toLowerCase().includes(q));
+    if(m){selId=m.id;showPanel(m);hl(m);centerOn(m)}}
+  if(e.key==="Escape"){searchEl.value="";clearSel()}
+});
+
+function centerOn(c){
+  const t=d3.zoomTransform(svg.node());
+  svg.transition().duration(400).call(zoom.transform,
+    d3.zoomIdentity.translate(W/2-c.cx*t.k,H/2-c.cy*t.k).scale(t.k));
+}
+
+// ── Fit to view ───────────────────────────────────────
+const bb=root.node().getBBox();
+const sc=Math.min(W/(bb.width+100),H/(bb.height+100),1.5)*.92;
+svg.call(zoom.transform,d3.zoomIdentity.translate(W/2,H/2).scale(sc).translate(-bb.x-bb.width/2,-bb.y-bb.height/2));
+
+function esc(s){const d=document.createElement("div");d.textContent=s;return d.innerHTML}
+function escA(s){return s.replace(/"/g,"&quot;")}
+
+}// end initGraph
+</script>
+</body>
+</html>
