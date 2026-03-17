@@ -90,13 +90,28 @@ Execution:
 
 Do not rely on chat history alone.
 
-Required files:
-- `CLAUDE.md`
-- `tasks/todo.md`
-- `tasks/lessons.md`
-- `SCRATCHPAD.md`
+### Tiered reading
 
-Rules:
+**Always read** (small, governance-critical):
+- `.claude/CLAUDE.md`
+- `apps/api/CLAUDE.md` (when touching API)
+- `apps/api/routes/CLAUDE.md` (when touching routes)
+
+**Read on demand** (large files — grep or read specific sections, never full-file unless required):
+- `docs/operational_contracts.md` (1000+ lines) — grep for the endpoint name, read only that section
+- `docs/leads_runbook.md` (300+ lines) — grep for the topic, read only that section
+- `apps/api/routes/internal.py` (2200+ lines) — grep for function/endpoint name, read only the relevant block
+- `tests/api/test_api.py` (6500+ lines) — grep for test name or keyword, never read full file
+- `apps/api/schemas.py` (600+ lines) — grep for model name, read only that class
+
+**Read when structurally relevant** (medium files, full read acceptable):
+- `docs/component_index.md` — when adding/removing components
+- `docs/system_map.md` — when changing structure or topology
+- `docs/work_templates.md` — when starting a formal block
+
+**Default reading strategy:** grep first, then read the matched section with context. Expand only if the section is insufficient. Do not read a 1000-line file to find one endpoint contract.
+
+### General rules
 - keep one conversation per feature or task block when possible
 - do not drag noisy context forward
 - when context degrades, write down critical facts and reset
@@ -115,6 +130,24 @@ Do not reopen a closed module unless:
 - the change prevents likely rework
 - the change materially improves reuse or safety
 - the human explicitly prioritizes reopening it
+
+### Settled surfaces
+
+These behaviors are verified, tested, and locked. Skip re-inspection by default. Settled does not mean frozen forever — it means skip unless triggered.
+
+Current settled surfaces:
+- **Dedup logic** — `(email, source)` normalization + UNIQUE constraint + IntegrityError handler
+- **Source normalization** — `.strip().lower()` in `_create_lead_internal()`, regex enforcement in `/leads/external`
+- **Scoring behavior** — base 50 + 10 for user notes, `@ext:` excluded, source param unused
+- **Cross-surface invariants** — snapshot/review/daily-actions/client-ready consistency (locked by 3 invariant tests)
+- **`_get_actionable_leads()`** — selection logic (score >= 40 OR has notes), sort, source filter
+- **`_get_claimed_lead_ids()`** — claim exclusion set from dispatch_claims
+
+**Real triggers that justify reopening:** endpoint/schema/response shape change, query param or filter change, observable behavior change, cross-surface dependency change, doc drift on that surface, new finding from audit/sentinel/proof-verifier/drift-detector, test or invariant that protects it changed, new block that directly touches the surface, explicit user request.
+
+**Not triggers:** vague suspicion, routine rereads, "we haven't looked in a while", unrelated blocks.
+
+When an exploration agent is used, explicitly exclude settled surfaces from its scope unless the current block's goal directly touches them.
 
 Foundational work is allowed when it creates reusable infrastructure, prevents likely rework, reduces material risk, or enables a future strategic vertical without contaminating the current MVP.
 
@@ -235,6 +268,85 @@ For any non-trivial task, end with exactly:
 - Not verified
 - Left untouched
 - Follow-up / debt
+
+Compact reporting rules:
+- **Left untouched:** only list files or areas that were plausible candidates but deliberately skipped. Do not list everything that wasn't touched.
+- **Not verified:** keep short and non-repetitive. `ruff: not available` once is enough.
+- Do not restate plan rationale or "why no code changes were needed" unless that conclusion is itself the key finding. The report is facts: what changed, what was verified, what remains.
+- Prefer concise factual closure over narrative repetition.
+
+### Maintenance signal priority
+
+When multiple maintenance signals appear, process in this order:
+
+| Priority | Condition | Action |
+|---|---|---|
+| **P1** | high severity + revenue impact | Process immediately. Use repair template. |
+| **P2** | high severity + ops impact | Process same session. Use repair template. |
+| **P3** | medium severity + any impact | Process before next block if quick. Defer if > 30 min. |
+| **P4** | low severity or redundancy-only | Do not open HARDEN block. Note as debt if recurring. |
+
+**Confidence label** — when reporting a maintenance finding, state signal confidence:
+- **high:** test failure, reproducible mismatch, or bot finding with evidence
+- **medium:** manual observation, drift suspicion with partial evidence
+- **low:** vague report, no reproduction, or hearsay
+
+Do not open a HARDEN block on a low-confidence signal. Verify first, then decide.
+
+Documentation drift checkpoint — required for any block that adds, removes, or changes an endpoint, schema, surface, response shape, query param, or named construct:
+
+For each of these files, state exactly one of: `updated` / `not needed` / `deferred (reason)`:
+- `docs/operational_contracts.md` — when endpoint, contract, response, filter, or observable behavior changed
+- `docs/component_index.md` — when a component, surface, or endpoint group was added or removed
+- `docs/system_map.md` — when structural or topology-level changes occurred (new modules, new entry paths, new shared constructs, test count milestone)
+
+This is a mandatory evaluation, not a mandatory edit. If nothing changed that affects a doc, state `not needed`. Do not update docs blindly. Skip this checkpoint entirely for blocks that only touch tests, internal docs, config, or logic with no contract or surface impact.
+
+### Governance bot payload snippets
+
+Use these skeletons instead of reading `schemas.py` each time. Fill in the block-specific values.
+
+**Scope Critic** (`POST /internal/scope-critic`):
+```json
+{
+  "classification": "BUILD|HARDEN",
+  "goal": "...",
+  "scope": "...",
+  "out_of_scope": "...",
+  "expected_files": ["file1.py", "file2.py"],
+  "main_risk": "...",
+  "minimum_acceptable": "..."
+}
+```
+
+**Proof Verifier** (`POST /internal/proof-verifier`):
+```json
+{
+  "block_name": "...",
+  "classification": "GREEN|YELLOW|RED",
+  "claimed_changes": ["change 1", "change 2"],
+  "claimed_verified": ["evidence 1 (include filenames)", "evidence 2"],
+  "claimed_not_verified": ["ruff check/format not available"],
+  "files_touched": ["apps/api/routes/internal.py", "tests/api/test_api.py"],
+  "tests_run": ["python -m pytest tests/ -v (N passed)"],
+  "status_claim": "accepted_for_mvp"
+}
+```
+
+**Drift Detector** (`POST /internal/drift-detector`):
+```json
+{
+  "scope": "...",
+  "plan_expected_files": ["file1.py", "file2.py"],
+  "plan_out_of_scope": "...",
+  "plan_classification": "BUILD|HARDEN",
+  "files_changed": ["file1.py", "file2.py"],
+  "report_files_touched": ["file1.py", "file2.py"],
+  "report_claimed_changes": ["change 1", "change 2"],
+  "report_classification": "GREEN|YELLOW|RED",
+  "summary_of_changes": "..."
+}
+```
 
 ---
 

@@ -18,6 +18,8 @@
 | Endpoint | Method | Status |
 |---|---|---|
 | /health | GET | OK |
+| /health/detail | GET | OK — detailed health check with database status and lead count |
+| /leads/sources | GET | OK — list of unique lead sources, ordered alphabetically |
 | /leads | POST | OK — normalizes source/email, dedup by email+source, 409 if duplicate |
 | /leads/ingest | POST | OK — bulk ingestion, reuses internal create path, returns created/duplicates/errors counts |
 | /leads/webhook/{provider} | POST | OK — single lead via webhook, source set to webhook:{provider}, 409 if duplicate |
@@ -59,9 +61,11 @@
 | /internal/outcomes/by-source | GET | OK — outcome counts broken down by lead source. Returns per-source totals with all 6 outcome counts. Read-only, no persistence |
 | /internal/followup-queue | GET | OK — retry candidates: leads whose latest outcome is no_answer, excluding claimed leads. Ordered by score DESC. Read-only, reuses get_lead_pack() for operational context |
 | /internal/source-outcome-actions | GET | OK — outcome-aware source recommendations. 5 deterministic rules, 3 recommendation values (keep/review/deprioritize). Honest sparsity handling via data_sufficient flag. Read-only, no persistence |
+| /internal/source-intelligence | GET | OK — unified per-source intelligence. Combines lead counts, avg score, pending_review, client_ready, followup_candidates, outcome breakdown, and recommendation per source. Global totals at top. Optional `source` exact-match filter. Read-only, no persistence |
 | /internal/daily-actions | GET | OK — compact daily action surface composing review, client-ready, followup, and source warning signals. Each section capped at 5 items. Summary counts reflect pre-cap totals. Read-only, no persistence |
 | /internal/followup-handoffs | GET | OK — action handoff surface for no_answer retry candidates. Provides channel, action, instruction, and suggested message per lead. Score-tier templates. Excludes claimed leads. Read-only, no persistence |
 | /internal/followup-automation | GET | OK — machine-consumable follow-up payloads for automation consumers. Same selection/ordering as followup-handoffs. Top-level routing fields + nested payload. Priority = relative list position. Read-only, no persistence |
+| /internal/followup-automation/export.csv | GET | OK — CSV export of followup automation items. Columns: lead_id, to, subject, body, channel, priority, source, score, rating. Same selection as JSON endpoint. Supports source filter and limit. Read-only, no persistence |
 | /demo/intake | GET | OK — demo-only disposable HTML form for POST /leads/external. Exposes name/email/source/phone/notes only (metadata intentionally omitted). Same-origin, no auth, no framework. Not an official frontend surface |
 
 ---
@@ -73,6 +77,60 @@
 - Lightweight deduplication: email + source (post-normalization). Duplicate returns 409 with body LeadCreateResult and meta.status = "duplicate"
 - Scoring is calculated with normalized source
 - Response 200: LeadCreateResult with meta.status = "accepted"
+
+### POST /leads/external
+
+**Purpose:** Canonical adapter for external integrations (forms, landings, n8n, etc.). Recommended over legacy `POST /leads` for all new external callers.
+
+**Request body:**
+```json
+{
+  "name": "string (required, min_length=1)",
+  "email": "string (required, valid email)",
+  "source": "string (required, must match type:identifier format)",
+  "phone": "string | null (optional)",
+  "notes": "string | null (optional)",
+  "metadata": "object | null (optional, arbitrary key-value pairs)"
+}
+```
+
+**Source format:** Enforced via regex `^[a-z0-9]+:[a-z0-9][a-z0-9_-]*$`. Examples: `landing:barcos-venta`, `n8n:captacion`, `form:contact`. Bare words rejected with 422.
+
+**Normalization:** `name.strip()`, `email.strip().lower()`, `source.strip().lower()`.
+
+**Phone/metadata handling:** If `phone` or `metadata` are provided, they are serialized into the `notes` field as `@ext:{"phone":"+34...","key":"val"}`. If neither is provided, notes are preserved as-is. Phone field overrides `metadata["phone"]` if both exist.
+
+**Deduplication:** `(email, source)` post-normalization. DB UNIQUE constraint as safety net. Race condition handled via IntegrityError catch + re-fetch.
+
+**Scoring:** Base 50 + 10 if notes contain real user text (non-`@ext:` lines). `@ext:`-only metadata does not increment score.
+
+**Response 200 (accepted):**
+```json
+{
+  "status": "accepted",
+  "lead_id": 42,
+  "score": 60,
+  "message": "lead received"
+}
+```
+
+**Response 409 (duplicate):**
+```json
+{
+  "status": "duplicate",
+  "lead_id": 42,
+  "score": 60,
+  "message": "lead already exists"
+}
+```
+
+**Response 422 (validation error):** Returned for missing required fields, invalid email format, empty name/source after strip, or source not matching `type:identifier` format. Body is standard FastAPI/Pydantic validation error or `{"detail": "..."}`.
+
+**Known limitations:**
+- No phone format validation (accepts any string)
+- No metadata schema validation (accepts any JSON-serializable dict)
+- No notes length limit
+- Score does not depend on source value (source parameter exists in scoring function but is unused)
 
 ### GET /leads
 - Optional query params: source (exact match), min_score (>= int, ge=0), limit (ge=1), offset (ge=0), q (LIKE %q% on name, email, notes), created_from (YYYY-MM-DD, inclusive), created_to (YYYY-MM-DD, inclusive through end of day via `' 23:59:59'` suffix)
@@ -559,6 +617,58 @@ Retry candidates: leads whose latest outcome is `no_answer`. Read-only.
 - No date filtering — recommendations use all-time outcome data.
 - No proxy field integration — consumer must cross-reference with `/internal/source-actions` for proxy signals.
 
+### GET /internal/source-intelligence
+
+**Purpose:** Unified per-source intelligence view. Combines lead counts, average score, operational action counts, outcome breakdown, and recommendation into a single response per source. Global totals at the top. Eliminates the need to call `/internal/source-performance`, `/internal/source-outcome-actions`, and `/internal/ops/snapshot` separately.
+
+**Query params:**
+- `source` (optional): exact-match filter on source name (case-insensitive, trimmed)
+
+**Response shape:**
+```json
+{
+  "generated_at": "...",
+  "total_sources": 3,
+  "totals": {
+    "leads": 42,
+    "avg_score": 58.3,
+    "pending_review": 5,
+    "client_ready": 8,
+    "followup_candidates": 3,
+    "outcomes": { "contacted": 2, "qualified": 4, "won": 3, "lost": 2, "no_answer": 3, "bad_fit": 1 }
+  },
+  "by_source": [
+    {
+      "source": "linkedin",
+      "leads": 15,
+      "avg_score": 62.1,
+      "pending_review": 2,
+      "client_ready": 4,
+      "followup_candidates": 1,
+      "outcomes": { "contacted": 1, "qualified": 2, "won": 2, "lost": 0, "no_answer": 1, "bad_fit": 0 },
+      "recommendation": "keep",
+      "rationale": "strong qualified/won signal (66%)",
+      "data_sufficient": true
+    }
+  ]
+}
+```
+
+**Logic reuse:**
+- Lead counts + avg_score: same SQL pattern as `/internal/source-performance`
+- `pending_review`, `client_ready`: counted from `_get_actionable_leads(source)`, same as `source-performance`
+- Outcome counts: same SQL pattern as `/internal/source-outcome-actions`
+- `recommendation`, `rationale`, `data_sufficient`: reuses `_source_outcome_recommendation()` directly
+- `followup_candidates`: equals `outcomes.no_answer` count
+- `totals`: computed as sum of per-source values; `avg_score` is weighted average
+
+**Ordering:** `by_source` sorted by `leads` DESC, then `source` ASC (deterministic).
+
+**Known debt:**
+- No date filtering — uses all-time data.
+- Sources with zero leads do not appear.
+- `pending_review` and `client_ready` are independent of claim status (measure source quality, not queue state).
+
 ### GET /internal/daily-actions
 
 **Purpose:** Compact daily action surface that answers "what should we do today?" by composing existing operational signals into one response. Not a dashboard — a prioritized action view.
@@ -697,6 +807,36 @@ Retry candidates: leads whose latest outcome is `no_answer`. Read-only.
 - No retry counter.
 - Does not send or schedule — pure payload surface.
 
+### GET /internal/followup-automation/export.csv
+
+**Purpose:** CSV export of followup automation items. Produces an operator-ready flat file that can be opened in any spreadsheet, pasted into an email tool, or consumed by external scripts/n8n.
+
+**Query parameters:**
+| Parameter | Type | Default | Effect |
+|-----------|------|---------|--------|
+| `source` | string | none | Filter by lead source |
+| `limit` | int (≥1) | none | Cap number of output rows |
+
+**Columns:** `lead_id, to, subject, body, channel, priority, source, score, rating`
+
+**Column semantics:**
+- `to`: recipient email address.
+- `subject`: deterministic from rating tier (`high` → "Following up — let's connect this week", `medium` → "Quick follow-up", `low` → "Checking in", fallback → "Follow-up").
+- `body`: deterministic suggested message from rating tier + lead name (same templates as `/internal/followup-automation` and bridge).
+- `priority`: relative list position (0 = highest), same as JSON endpoint.
+- All other fields: same meaning as `/internal/followup-automation` payload fields.
+
+**Selection:** Same as `/internal/followup-automation`: `outcome = 'no_answer'`, excludes claimed, ordered `score DESC, lead_id ASC`. Source filter applied at SQL level.
+
+**Response:** `text/csv` with `Content-Disposition: attachment; filename=followup-automation.csv`. CSV values sanitized against formula injection (same `_sanitize_csv_value` as handoffs export).
+
+**Consistency:** With no source filter, CSV lead_ids match JSON endpoint lead_ids in same order.
+
+**Known debt:**
+- No pagination (limit only).
+- No date filtering on outcome timestamp.
+- Subject templates duplicated from bridge (minimal — 4-entry dict, not worth abstracting for one consumer).
+
 ### Follow-up Automation Bridge (apps/api/automations/followup_bridge.py)
 
 **Purpose:** Minimal consumer bridge that validates GET /internal/followup-automation is programmatically consumable. Fetches, parses, and maps automation items into execution-ready outputs. Does not send, schedule, or mutate anything.
@@ -737,6 +877,35 @@ Retry candidates: leads whose latest outcome is `no_answer`. Read-only.
 - Channel is whatever the API exposes (email currently). No multi-channel abstraction.
 - No retry logic, no scheduling, no queue infrastructure.
 - Module may need to move outside apps/api/ if more external consumers appear.
+
+### Follow-up Automation Bridge (\)
+
+**Purpose:** Minimal consumer bridge that validates \ is programmatically consumable. Fetches, parses, and maps automation items into execution-ready outputs. Does not send, schedule, or mutate anything.
+
+**Interface:**
+**Output contract:**
+- \: \, \ (email), \ (deterministic from rating), \ (suggested_message), \, \, \, \, - \: \, \, \, \ (list of BridgeItem), \ (list of str)
+
+**Subject mapping (deterministic):**
+
+| Rating | Subject |
+|--------|---------|
+| high | Following up — let's connect this week |
+| medium | Quick follow-up |
+| low | Checking in |
+
+**Key behaviors:**
+- Read-only — does not send, mutate, or persist anything.
+- Ordering is trusted from the API and not recomputed.
+- Non-200 response or invalid top-level shape -> global failure with error.
+- Invalid individual item -> skip that item, record error, continue mapping the rest.
+- Colocated under \ for MVP pragmatism — not core API business logic.
+
+**Known debt:**
+- Idempotency is out of scope — nothing is sent, so dedup is not yet needed. When a real sender is added, dedup by lead_id and execution window becomes mandatory.
+- Channel is whatever the API exposes (\ currently) — no multi-channel abstraction.
+- No retry logic, no scheduling, no queue infrastructure.
+- Module may need to move outside \ if more external consumers appear.
 
 ---
 

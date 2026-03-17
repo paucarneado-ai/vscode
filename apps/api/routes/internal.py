@@ -69,6 +69,10 @@ from apps.api.schemas import (
     SentinelResponse,
     SourceActionItem,
     SourceActionResponse,
+    SourceIntelligenceItem,
+    SourceIntelligenceOutcomes,
+    SourceIntelligenceResponse,
+    SourceIntelligenceTotals,
     SourceOutcomeActionItem,
     SourceOutcomeActionResponse,
     SourcePerformanceResponse,
@@ -2012,4 +2016,194 @@ def get_followup_automation() -> FollowupAutomationResponse:
         generated_at=datetime.now(timezone.utc).isoformat(),
         total=len(items),
         items=items,
+    )
+
+
+# --- Follow-up Automation CSV Export ---
+
+_FOLLOWUP_CSV_COLUMNS = [
+    "lead_id", "to", "subject", "body", "channel", "priority",
+    "source", "score", "rating",
+]
+
+_FOLLOWUP_SUBJECT_BY_RATING: dict[str, str] = {
+    "high": "Following up \u2014 let\u2019s connect this week",
+    "medium": "Quick follow-up",
+    "low": "Checking in",
+}
+
+
+@router.get(
+    "/internal/followup-automation/export.csv",
+    response_class=PlainTextResponse,
+)
+def export_followup_automation_csv(
+    source: str | None = None,
+    limit: int | None = Query(default=None, ge=1),
+) -> PlainTextResponse:
+    """CSV export of followup automation items for operator/external-tool use."""
+    db = get_db()
+    query = """
+        SELECT lo.lead_id, l.name, l.email, l.source, l.score
+        FROM lead_outcomes lo
+        JOIN leads l ON l.id = lo.lead_id
+        WHERE lo.outcome = 'no_answer'
+    """
+    params: list[object] = []
+    if source is not None:
+        query += " AND l.source = ?"
+        params.append(source)
+    query += " ORDER BY l.score DESC, lo.lead_id ASC"
+    rows = db.execute(query, params).fetchall()
+    claimed_ids = _get_claimed_lead_ids()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(_FOLLOWUP_CSV_COLUMNS)
+    count = 0
+    for i, row in enumerate(r for r in rows if r["lead_id"] not in claimed_ids):
+        if limit is not None and count >= limit:
+            break
+        rating = get_rating(row["score"])
+        csv_row = {
+            "lead_id": row["lead_id"],
+            "to": row["email"],
+            "subject": _FOLLOWUP_SUBJECT_BY_RATING.get(rating, "Follow-up"),
+            "body": _followup_message(row["name"], rating),
+            "channel": "email",
+            "priority": i,
+            "source": row["source"],
+            "score": row["score"],
+            "rating": rating,
+        }
+        writer.writerow(
+            [_sanitize_csv_value(csv_row[col]) for col in _FOLLOWUP_CSV_COLUMNS]
+        )
+        count += 1
+    return PlainTextResponse(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": "attachment; filename=followup-automation.csv",
+        },
+    )
+
+
+# --- Source Intelligence ---
+
+
+@router.get(
+    "/internal/source-intelligence",
+    response_model=SourceIntelligenceResponse,
+)
+def get_source_intelligence(
+    source: str | None = Query(default=None),
+) -> SourceIntelligenceResponse:
+    """Unified per-source intelligence: leads, scores, actions, outcomes."""
+    db = get_db()
+
+    # 1. Per-source lead counts and avg score
+    src_filter = ""
+    src_params: list[str] = []
+    if source is not None:
+        src_filter = " WHERE source = ?"
+        src_params = [source.strip().lower()]
+    lead_rows = db.execute(
+        "SELECT source, COUNT(*) AS total, ROUND(AVG(score), 1) AS avg_score "
+        f"FROM leads{src_filter} GROUP BY source ORDER BY total DESC",
+        src_params,
+    ).fetchall()
+    lead_map: dict[str, dict] = {
+        r["source"]: {"leads": r["total"], "avg_score": r["avg_score"]}
+        for r in lead_rows
+    }
+
+    # 2. Per-source action counts (reuse _get_actionable_leads)
+    actionable = _get_actionable_leads(source)
+    action_counts: dict[str, dict[str, int]] = {}
+    for lead in actionable:
+        counts = action_counts.setdefault(
+            lead.source, {"client_ready": 0, "review": 0}
+        )
+        if lead.next_action == "send_to_client":
+            counts["client_ready"] += 1
+        elif lead.next_action == "review_manually":
+            counts["review"] += 1
+
+    # 3. Per-source outcome counts (reuse source-outcome-actions pattern)
+    outcome_filter = ""
+    outcome_params: list[str] = []
+    if source is not None:
+        outcome_filter = " WHERE l.source = ?"
+        outcome_params = [source.strip().lower()]
+    outcome_rows = db.execute(
+        "SELECT l.source, lo.outcome, COUNT(*) as cnt "
+        "FROM lead_outcomes lo "
+        f"JOIN leads l ON l.id = lo.lead_id{outcome_filter} "
+        "GROUP BY l.source, lo.outcome",
+        outcome_params,
+    ).fetchall()
+    outcome_map: dict[str, dict[str, int]] = {}
+    for row in outcome_rows:
+        src = row["source"]
+        if src not in outcome_map:
+            outcome_map[src] = {v: 0 for v in _OUTCOME_VALUES}
+        outcome_map[src][row["outcome"]] = row["cnt"]
+
+    # 4. Build per-source items
+    all_sources = sorted(
+        lead_map.keys(), key=lambda s: (-lead_map[s]["leads"], s)
+    )
+    items: list[SourceIntelligenceItem] = []
+    for src in all_sources:
+        info = lead_map[src]
+        actions = action_counts.get(src, {"client_ready": 0, "review": 0})
+        outcomes = outcome_map.get(src, {v: 0 for v in _OUTCOME_VALUES})
+        total_outcomes = sum(outcomes.values())
+        recommendation, rationale, data_sufficient = (
+            _source_outcome_recommendation(outcomes, total_outcomes)
+        )
+        items.append(
+            SourceIntelligenceItem(
+                source=src,
+                leads=info["leads"],
+                avg_score=info["avg_score"],
+                pending_review=actions["review"],
+                client_ready=actions["client_ready"],
+                followup_candidates=outcomes.get("no_answer", 0),
+                outcomes=SourceIntelligenceOutcomes(**outcomes),
+                recommendation=recommendation,
+                rationale=rationale,
+                data_sufficient=data_sufficient,
+            )
+        )
+
+    # 5. Global totals
+    total_leads = sum(it.leads for it in items)
+    total_avg = (
+        round(sum(it.avg_score * it.leads for it in items) / total_leads, 1)
+        if total_leads
+        else 0.0
+    )
+    total_outcomes = SourceIntelligenceOutcomes(
+        contacted=sum(it.outcomes.contacted for it in items),
+        qualified=sum(it.outcomes.qualified for it in items),
+        won=sum(it.outcomes.won for it in items),
+        lost=sum(it.outcomes.lost for it in items),
+        no_answer=sum(it.outcomes.no_answer for it in items),
+        bad_fit=sum(it.outcomes.bad_fit for it in items),
+    )
+    totals = SourceIntelligenceTotals(
+        leads=total_leads,
+        avg_score=total_avg,
+        pending_review=sum(it.pending_review for it in items),
+        client_ready=sum(it.client_ready for it in items),
+        followup_candidates=sum(it.followup_candidates for it in items),
+        outcomes=total_outcomes,
+    )
+
+    return SourceIntelligenceResponse(
+        generated_at=datetime.now(timezone.utc).isoformat(),
+        total_sources=len(items),
+        totals=totals,
+        by_source=items,
     )

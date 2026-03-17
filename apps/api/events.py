@@ -1,26 +1,37 @@
-"""Lightweight event emitter — logs events and optionally persists to DB."""
+"""Minimal internal event spine.
 
-import logging
+Append-only event log for operational traceability.
+Best-effort: emit failures never break the primary operation.
+"""
+
+import json
 from datetime import datetime, timezone
 
-logger = logging.getLogger(__name__)
+from apps.api.db import get_db
 
 
 def emit_event(
     event_type: str,
     entity_type: str,
-    entity_id: str,
-    source: str,
-    payload: dict,
+    entity_id: int,
+    origin_module: str,
+    payload: dict | None = None,
 ) -> None:
-    """Fire-and-forget event emission. Never raises."""
+    """Append one event to the events table. Best-effort — failures are silent."""
     try:
-        logger.info(
-            "event=%s entity=%s:%s source=%s",
-            event_type,
-            entity_type,
-            entity_id,
-            source,
+        db = get_db()
+        db.execute(
+            "INSERT INTO events (event_type, entity_type, entity_id, origin_module, payload, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                event_type,
+                entity_type,
+                entity_id,
+                origin_module,
+                json.dumps(payload or {}, ensure_ascii=False, separators=(",", ":")),
+                datetime.now(timezone.utc).isoformat(),
+            ),
         )
+        db.commit()
     except Exception:
         pass

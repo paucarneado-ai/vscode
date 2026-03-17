@@ -463,6 +463,44 @@ class SourceOutcomeActionResponse(BaseModel):
     items: list[SourceOutcomeActionItem]
 
 
+class SourceIntelligenceOutcomes(BaseModel):
+    contacted: int = 0
+    qualified: int = 0
+    won: int = 0
+    lost: int = 0
+    no_answer: int = 0
+    bad_fit: int = 0
+
+
+class SourceIntelligenceTotals(BaseModel):
+    leads: int
+    avg_score: float
+    pending_review: int
+    client_ready: int
+    followup_candidates: int
+    outcomes: SourceIntelligenceOutcomes
+
+
+class SourceIntelligenceItem(BaseModel):
+    source: str
+    leads: int
+    avg_score: float
+    pending_review: int
+    client_ready: int
+    followup_candidates: int
+    outcomes: SourceIntelligenceOutcomes
+    recommendation: str
+    rationale: str
+    data_sufficient: bool
+
+
+class SourceIntelligenceResponse(BaseModel):
+    generated_at: str
+    total_sources: int
+    totals: SourceIntelligenceTotals
+    by_source: list[SourceIntelligenceItem]
+
+
 class DailyActionSummary(BaseModel):
     pending_review: int
     client_ready: int

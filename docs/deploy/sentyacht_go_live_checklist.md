@@ -64,3 +64,13 @@ Datos de rollback:
 - [ ] Revisar si han llegado leads reales o solo spam
 - [ ] Si llegan leads: contactar al primero y evaluar calidad del circuito
 - [ ] Si no llegan leads en 48h: verificar que el formulario funciona, no asumir problema de conversión
+
+## 9. Siguiente paso: prueba de captación controlada
+
+Una vez completadas las secciones 1–8, el sitio está en producción y el circuito funciona.
+
+El siguiente paso inmediato es lanzar una primera prueba de captación controlada con tráfico pagado. El protocolo completo está en:
+
+**→ `docs/acquisition/trial_launch_prep.md`**
+
+Ese documento incluye: fuentes, naming de source, copies de anuncio, checklist pre-lanzamiento, operativa diaria durante la prueba y criterios de stop/continue.

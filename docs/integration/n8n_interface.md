@@ -99,11 +99,27 @@ GET /api/health
 
 **Patron n8n:** polling cada 5 min. Si falla, alerta.
 
+### 7. Ingesta externa canonica
+
+```
+POST /api/leads/external
+```
+
+**Uso:** adapter canonico para ingesta externa generica. Acepta phone y metadata ademas de los campos base. Recomendado sobre `/leads/webhook/{provider}` para nuevas integraciones que no necesitan un provider dedicado.
+
+**Body:** `{name, email, source, phone?, notes?, metadata?}`
+
+**Source:** debe seguir formato `tipo:identificador` (ej. `n8n:captacion`, `landing:barcos-venta`). Bare words rechazados con 422.
+
+**Respuesta:** `{status: "accepted"|"duplicate", lead_id, score, message}`. Duplicados devuelven 409.
+
+**Patron n8n:** HTTP Request node con POST, body JSON. Verificar `status` en respuesta para distinguir aceptado vs duplicado.
+
 ## Endpoints NO recomendados para n8n
 
 | Endpoint | Razon |
 |---|---|
-| POST /api/leads | Reservado para integraciones directas con contrato source explicito. Si n8n necesita ingestar leads de otra fuente, usar POST /api/leads/webhook/{provider}. |
+| POST /api/leads | Reservado para integraciones directas con contrato source explicito. Preferir POST /api/leads/external para nuevas integraciones. |
 | GET /api/leads/actionable | Redundante con queue para automatizacion. Queue ya tiene priorizacion. |
 | GET /api/leads/actionable/worklist | Util para consumo humano, no para n8n (agrupacion innecesaria para bots). |
 | GET /api/leads/{id}/delivery | Contrato de delivery, no de automatizacion. |

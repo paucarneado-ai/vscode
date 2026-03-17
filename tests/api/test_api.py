@@ -2540,8 +2540,45 @@ def test_external_duplicate():
 
     resp2 = client.post("/leads/external", json=payload)
     assert resp2.status_code == 409
-    assert resp2.json()["status"] == "duplicate"
-    assert resp2.json()["lead_id"] == resp1.json()["lead_id"]
+    data = resp2.json()
+    assert data["status"] == "duplicate"
+    assert data["lead_id"] == resp1.json()["lead_id"]
+    assert isinstance(data["score"], int)
+    assert data["message"] == "lead already exists"
+
+
+def test_external_response_shape_accepted():
+    """Accepted response has exactly 4 fields with correct types."""
+    resp = client.post("/leads/external", json={
+        "name": "Shape Accepted",
+        "email": "shape-accepted@example.com",
+        "source": "test:shape-ok",
+    })
+    assert resp.status_code == 200
+    data = resp.json()
+    assert set(data.keys()) == {"status", "lead_id", "score", "message"}
+    assert data["status"] == "accepted"
+    assert isinstance(data["lead_id"], int)
+    assert isinstance(data["score"], int)
+    assert isinstance(data["message"], str)
+
+
+def test_external_response_shape_duplicate():
+    """Duplicate response has same 4-field shape as accepted."""
+    payload = {
+        "name": "Shape Dup",
+        "email": "shape-dup@example.com",
+        "source": "test:shape-dup",
+    }
+    client.post("/leads/external", json=payload)
+    resp = client.post("/leads/external", json=payload)
+    assert resp.status_code == 409
+    data = resp.json()
+    assert set(data.keys()) == {"status", "lead_id", "score", "message"}
+    assert data["status"] == "duplicate"
+    assert isinstance(data["lead_id"], int)
+    assert isinstance(data["score"], int)
+    assert isinstance(data["message"], str)
 
 
 def test_external_same_email_different_source():
@@ -6100,6 +6137,166 @@ def test_existing_endpoints_still_work_after_followup_automation():
         assert resp.status_code == 200
 
 
+# --- Followup Automation CSV Export tests ---
+
+
+def _ensure_followup_export_leads():
+    """Create no_answer leads for CSV export testing if not already present."""
+    _setup_followup_handoff_lead(
+        "FExp High", "fexp_high@t.com", "fexp_src", "important notes score_override_80", "no_answer",
+    )
+    _setup_followup_handoff_lead(
+        "FExp Med", "fexp_med@t.com", "fexp_src", "notes score_override_60", "no_answer",
+    )
+    _setup_followup_handoff_lead(
+        "FExp Low", "fexp_low@t.com", "fexp_other", "notes score_override_20", "no_answer",
+    )
+    _setup_followup_handoff_lead(
+        "FExp Won", "fexp_won@t.com", "fexp_src", "notes score_override_50", "won",
+    )
+
+
+def test_followup_export_csv_shape():
+    """Response is text/csv with attachment header."""
+    _ensure_followup_export_leads()
+    resp = client.get("/internal/followup-automation/export.csv")
+    assert resp.status_code == 200
+    assert "text/csv" in resp.headers["content-type"]
+    assert "attachment" in resp.headers.get("content-disposition", "")
+    assert "followup-automation.csv" in resp.headers.get("content-disposition", "")
+
+
+def test_followup_export_csv_columns():
+    """First row matches expected column headers."""
+    _ensure_followup_export_leads()
+    resp = client.get("/internal/followup-automation/export.csv")
+    lines = resp.text.strip().split("\n")
+    assert len(lines) >= 1
+    expected = "lead_id,to,subject,body,channel,priority,source,score,rating"
+    assert lines[0].strip() == expected
+
+
+def test_followup_export_csv_content():
+    """CSV contains rows for no_answer leads with correct fields."""
+    _ensure_followup_export_leads()
+    resp = client.get("/internal/followup-automation/export.csv")
+    reader = csv.DictReader(resp.text.strip().split("\n"))
+    rows = list(reader)
+    # Should include no_answer leads
+    emails = [r["to"] for r in rows]
+    assert "fexp_high@t.com" in emails
+    assert "fexp_med@t.com" in emails
+    assert "fexp_low@t.com" in emails
+    # Should NOT include won lead
+    assert "fexp_won@t.com" not in emails
+    # Check fields are populated
+    for row in rows:
+        assert row["lead_id"]
+        assert row["to"]
+        assert row["subject"]
+        assert row["body"]
+        assert row["channel"] == "email"
+        assert row["rating"] in ("low", "medium", "high")
+
+
+def test_followup_export_csv_excludes_claimed():
+    """Claimed leads must not appear in CSV export."""
+    _ensure_followup_export_leads()
+    # Get a lead_id from the export
+    resp = client.get("/internal/followup-automation/export.csv")
+    reader = csv.DictReader(resp.text.strip().split("\n"))
+    rows = list(reader)
+    if not rows:
+        return  # no leads to claim
+    target_id = int(rows[0]["lead_id"])
+    # Claim it
+    client.post("/internal/dispatch/claim", json={"lead_ids": [target_id]})
+    # Verify it's gone from export
+    resp2 = client.get("/internal/followup-automation/export.csv")
+    reader2 = csv.DictReader(resp2.text.strip().split("\n"))
+    exported_ids = [int(r["lead_id"]) for r in reader2]
+    assert target_id not in exported_ids
+    # Release the claim to avoid side effects
+    client.delete(f"/internal/dispatch/claim/{target_id}")
+
+
+def test_followup_export_csv_source_filter():
+    """Source query param filters CSV rows."""
+    _ensure_followup_export_leads()
+    resp = client.get("/internal/followup-automation/export.csv", params={"source": "fexp_other"})
+    reader = csv.DictReader(resp.text.strip().split("\n"))
+    rows = list(reader)
+    for row in rows:
+        assert row["source"] == "fexp_other"
+
+
+def test_followup_export_csv_limit():
+    """Limit query param caps output rows."""
+    _ensure_followup_export_leads()
+    resp = client.get("/internal/followup-automation/export.csv", params={"limit": 1})
+    reader = csv.DictReader(resp.text.strip().split("\n"))
+    rows = list(reader)
+    assert len(rows) <= 1
+
+
+def test_followup_export_csv_empty():
+    """With no matching leads, CSV has header only."""
+    resp = client.get(
+        "/internal/followup-automation/export.csv",
+        params={"source": "nonexistent_source_xyz"},
+    )
+    assert resp.status_code == 200
+    lines = [l for l in resp.text.strip().split("\n") if l.strip()]
+    assert len(lines) == 1  # header only
+
+
+def test_followup_export_csv_consistent_with_json():
+    """CSV lead_ids match JSON endpoint lead_ids in same order."""
+    _ensure_followup_export_leads()
+    json_resp = client.get("/internal/followup-automation")
+    json_ids = [item["lead_id"] for item in json_resp.json()["items"]]
+    csv_resp = client.get("/internal/followup-automation/export.csv")
+    reader = csv.DictReader(csv_resp.text.strip().split("\n"))
+    csv_ids = [int(r["lead_id"]) for r in reader]
+    # CSV must contain same ids in same order (may have fewer if source filter differs, but with no filter they match)
+    assert csv_ids == json_ids
+
+
+def test_followup_export_csv_body_with_commas_parses_correctly():
+    """Body field contains commas — csv.writer must quote it so DictReader round-trips cleanly."""
+    _ensure_followup_export_leads()
+    resp = client.get("/internal/followup-automation/export.csv")
+    reader = csv.DictReader(resp.text.strip().split("\n"))
+    for row in reader:
+        # Body always contains at least one comma (e.g., "Hi {name}, ...")
+        assert "," in row["body"], f"Expected comma in body: {row['body']}"
+        # Verify all 9 columns parsed (would break if quoting failed)
+        assert len(row) == 9, f"Expected 9 columns but got {len(row)}: {row}"
+
+
+def test_followup_export_csv_sanitizes_dangerous_source():
+    """Source starting with dangerous prefix must be sanitized in CSV output."""
+    # Create a lead with a dangerous-prefix source
+    resp = client.post("/leads", json={
+        "name": "Sanitize Test", "email": "sanitize_csv@t.com",
+        "source": "=cmd_dangerous", "notes": "notes score_override_50",
+    })
+    if resp.status_code == 200:
+        lid = resp.json()["lead"]["id"]
+    else:
+        leads = client.get("/leads", params={"q": "sanitize_csv@t.com"}).json()
+        lid = leads[0]["id"]
+    client.post("/internal/outcomes", json={"lead_id": lid, "outcome": "no_answer"})
+    resp = client.get("/internal/followup-automation/export.csv", params={"source": "=cmd_dangerous"})
+    reader = csv.DictReader(resp.text.strip().split("\n"))
+    rows = list(reader)
+    dangerous_rows = [r for r in rows if "sanitize_csv@t.com" in r["to"]]
+    assert len(dangerous_rows) >= 1
+    for row in dangerous_rows:
+        # Source must be sanitized — should start with apostrophe
+        assert row["source"].startswith("'"), f"Expected sanitized source but got: {row['source']}"
+
+
 # --- Drift Detector tests ---
 
 _DRIFT_BASE = {
@@ -6234,3 +6431,113 @@ def test_drift_detector_deterministic():
         assert f1["severity"] == f2["severity"]
         assert f1["plan_value"] == f2["plan_value"]
         assert f1["report_value"] == f2["report_value"]
+
+
+# --- Source Intelligence ---
+
+_si_ready = False
+
+
+def _ensure_si_data():
+    global _si_ready
+    if _si_ready:
+        return
+    _setup_followup_handoff_lead(
+        "SI Won Lead", "si-won@test.com", "si_source_a",
+        "notes score_override_80", "won",
+    )
+    _setup_followup_handoff_lead(
+        "SI Lost Lead", "si-lost@test.com", "si_source_a",
+        "notes score_override_55", "lost",
+    )
+    _setup_followup_handoff_lead(
+        "SI NoAnswer Lead", "si-na@test.com", "si_source_b",
+        "notes score_override_65", "no_answer",
+    )
+    _si_ready = True
+
+
+def test_source_intelligence_structure():
+    _ensure_si_data()
+    resp = client.get("/internal/source-intelligence")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "generated_at" in data
+    assert "total_sources" in data
+    assert "totals" in data
+    assert "by_source" in data
+    totals = data["totals"]
+    for field in ("leads", "avg_score", "pending_review", "client_ready",
+                  "followup_candidates", "outcomes"):
+        assert field in totals, f"Missing totals.{field}"
+    outcomes = totals["outcomes"]
+    for field in ("contacted", "qualified", "won", "lost", "no_answer", "bad_fit"):
+        assert field in outcomes, f"Missing totals.outcomes.{field}"
+    assert len(data["by_source"]) > 0
+    item = data["by_source"][0]
+    for field in ("source", "leads", "avg_score", "pending_review", "client_ready",
+                  "followup_candidates", "outcomes", "recommendation", "rationale",
+                  "data_sufficient"):
+        assert field in item, f"Missing by_source[].{field}"
+
+
+def test_source_intelligence_totals_consistent():
+    _ensure_si_data()
+    data = client.get("/internal/source-intelligence").json()
+    totals = data["totals"]
+    by_source = data["by_source"]
+    assert totals["leads"] == sum(it["leads"] for it in by_source)
+    assert totals["pending_review"] == sum(it["pending_review"] for it in by_source)
+    assert totals["client_ready"] == sum(it["client_ready"] for it in by_source)
+    assert totals["followup_candidates"] == sum(
+        it["followup_candidates"] for it in by_source
+    )
+    for field in ("contacted", "qualified", "won", "lost", "no_answer", "bad_fit"):
+        assert totals["outcomes"][field] == sum(
+            it["outcomes"][field] for it in by_source
+        ), f"totals.outcomes.{field} mismatch"
+
+
+def test_source_intelligence_ordering():
+    """by_source sorted by leads DESC, then source ASC."""
+    _ensure_si_data()
+    data = client.get("/internal/source-intelligence").json()
+    items = data["by_source"]
+    for i in range(len(items) - 1):
+        a, b = items[i], items[i + 1]
+        # leads DESC, source ASC → negate leads for tuple comparison
+        assert (-a["leads"], a["source"]) <= (-b["leads"], b["source"]), \
+            f"Ordering violated: {a['source']}({a['leads']}) before {b['source']}({b['leads']})"
+
+
+def test_source_intelligence_source_filter():
+    _ensure_si_data()
+    resp = client.get("/internal/source-intelligence", params={"source": "si_source_a"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total_sources"] == 1
+    assert data["by_source"][0]["source"] == "si_source_a"
+    assert data["totals"]["leads"] == data["by_source"][0]["leads"]
+
+
+def test_source_intelligence_outcomes_match_existing():
+    """Outcome counts must match /internal/source-outcome-actions for same sources."""
+    _ensure_si_data()
+    si = client.get("/internal/source-intelligence").json()
+    soa = client.get("/internal/source-outcome-actions").json()
+    soa_map = {it["source"]: it for it in soa["items"]}
+    for item in si["by_source"]:
+        if item["source"] in soa_map:
+            existing = soa_map[item["source"]]
+            for field in ("contacted", "qualified", "won", "lost", "no_answer", "bad_fit"):
+                assert item["outcomes"][field] == existing[field], \
+                    f"{item['source']}.{field}: SI={item['outcomes'][field]} vs SOA={existing[field]}"
+
+
+def test_source_intelligence_empty_source():
+    resp = client.get("/internal/source-intelligence", params={"source": "nonexistent_source_xyz"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total_sources"] == 0
+    assert data["by_source"] == []
+    assert data["totals"]["leads"] == 0
