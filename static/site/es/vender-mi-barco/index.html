@@ -316,6 +316,7 @@
     </div>
   </footer>
 
+  <script src="/config.js"></script>
   <script src="/shared.js"></script>
   <script>
     // ── Form submission ──
@@ -352,9 +353,12 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
           });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          form.classList.add('hidden');
-          successDiv.classList.remove('hidden');
+          if (res.ok || res.status === 409) {
+            form.classList.add('hidden');
+            successDiv.classList.remove('hidden');
+          } else {
+            throw new Error(`HTTP ${res.status}`);
+          }
         } catch (err) {
           console.error('Lead submission error:', err);
           errorDiv.classList.remove('hidden');

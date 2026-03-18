@@ -2,6 +2,21 @@
    SentYacht — Shared JavaScript
    ═══════════════════════════════════════════ */
 
+/* ─── Sentry Error Tracking ─── */
+(function() {
+  var cfg = window.SY_CONFIG || {};
+  if (!cfg.SENTRY_DSN) return;
+  var s = document.createElement('script');
+  s.src = 'https://browser.sentry-cdn.com/8.53.0/bundle.min.js';
+  s.crossOrigin = 'anonymous';
+  s.onload = function() {
+    if (window.Sentry) {
+      Sentry.init({ dsn: cfg.SENTRY_DSN, environment: cfg.SENTRY_ENV || 'production', sampleRate: 1.0 });
+    }
+  };
+  document.head.appendChild(s);
+})();
+
 /* ─── Scroll Reveal ─── */
 function initReveal() {
   const els = document.querySelectorAll('.reveal');
