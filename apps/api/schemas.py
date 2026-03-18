@@ -44,6 +44,15 @@ class WebhookLeadPayload(BaseModel):
     notes: str | None = None
 
 
+class WebIntakePayload(BaseModel):
+    nombre: str = Field(min_length=1)
+    email: EmailStr
+    telefono: str | None = None
+    interes: str | None = None
+    mensaje: str | None = None
+    origen: str | None = None
+
+
 class LeadOperationalSummary(BaseModel):
     lead_id: int
     name: str

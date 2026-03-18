@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vender mi barco — SentYacht · Brokerage Náutico Premium</title>
+  <meta name="description" content="Confíe la venta de su embarcación a un broker con más de 50 años de experiencia. Gestión seria, discreta y profesional desde El Masnou, Barcelona.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://sentyacht.es/es/vender-mi-barco/">
+
+  <meta property="og:title" content="Vender mi barco — SentYacht">
+  <meta property="og:description" content="Brokerage náutico premium. Más de 50 años de experiencia en compra-venta de embarcaciones en Barcelona y el Mediterráneo.">
+  <meta property="og:image" content="https://sentyacht.es/assets/hero image.jpg">
+  <meta property="og:url" content="https://sentyacht.es/es/vender-mi-barco/">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="es_ES">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90' fill='%230077CC'>S</text></svg>">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'dark-base': '#0B1220',
+            'dark-surface': '#142233',
+            'dark-floating': '#1A2D45',
+            'dark-border': '#1E3148',
+            'light-base': '#FAF7F2',
+            'light-surface': '#FFFFFF',
+            'light-border': '#E8E0D4',
+            'brand-blue': '#0077CC',
+            'brand-blue-hover': '#005FA3',
+            'brand-gold': '#C9A96E',
+            'brand-gold-hover': '#B8954F',
+            'txt-dark': '#F2EDE8',
+            'txt-dark-2': '#8A9BB5',
+            'txt-light': '#1A1A2E',
+            'txt-light-2': '#5C6370',
+          },
+          fontFamily: {
+            serif: ['Cormorant Garamond', 'Georgia', 'serif'],
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="preload" as="image" href="/assets/velero.jpg">
+    <!-- Meta Pixel Code -->
+    <script>
+    !function(f,b,e,v,n,t,s)
+    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+    if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+    n.queue=[];t=b.createElement(e);t.async=!0;
+    t.src=v;s=b.getElementsByTagName(e)[0];
+    s.parentNode.insertBefore(t,s)}(window, document,'script',
+    'https://connect.facebook.net/en_US/fbevents.js');
+    fbq('init', '2069294577261810');
+    fbq('track', 'PageView');
+    </script>
+    <noscript><img height="1" width="1" style="display:none"
+    src="https://www.facebook.com/tr?id=2069294577261810&ev=PageView&noscript=1"
+    /></noscript>
+    <!-- End Meta Pixel Code -->
+</head>
+<body class="bg-dark-base text-txt-dark font-sans antialiased">
+
+  <!-- ═══ CONFIGURATION ═══ -->
+  <script>
+    // OpenClaw endpoint — change this URL when the backend is ready
+    const LEAD_ENDPOINT = '/api/leads/intake/web';
+  </script>
+
+  <!-- Navigation -->
+  <nav id="navbar" class="fixed top-0 left-0 right-0 z-50 nav-solid">
+    <div class="max-w-7xl mx-auto px-6 lg:px-8">
+      <div class="flex items-center justify-between h-20">
+        <a href="/es/" class="flex items-center" aria-label="SentYacht - Inicio">
+          <img src="/assets/logo.png" alt="SentYacht" class="h-8 sm:h-9" loading="eager">
+        </a>
+        <div class="hidden md:flex items-center gap-10">
+          <a href="/es/yates-en-venta/" class="text-[13px] tracking-[0.15em] uppercase text-txt-dark/70 hover:text-txt-dark font-light" style="transition: color 0.3s;">Embarcaciones</a>
+          <a href="/es/#nosotros" class="text-[13px] tracking-[0.15em] uppercase text-txt-dark/70 hover:text-txt-dark font-light" style="transition: color 0.3s;">Nosotros</a>
+          <a href="/es/#contacto" class="text-[13px] tracking-[0.15em] uppercase text-txt-dark/70 hover:text-txt-dark font-light" style="transition: color 0.3s;">Contacto</a>
+          <a href="tel:+34609865215" class="btn-primary !py-2.5 !px-6 !text-[12px] ml-2">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+            Llamar
+          </a>
+        </div>
+        <button id="mobile-menu-btn" class="md:hidden flex flex-col gap-1.5 p-2" aria-label="Menú" aria-expanded="false">
+          <span class="block w-6 h-px bg-txt-dark hamburger-line origin-center" style="transition: transform 0.3s, opacity 0.3s;"></span>
+          <span class="block w-6 h-px bg-txt-dark hamburger-line" style="transition: transform 0.3s, opacity 0.3s;"></span>
+          <span class="block w-4 h-px bg-txt-dark hamburger-line origin-center" style="transition: transform 0.3s, opacity 0.3s, width 0.3s;"></span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Mobile Menu -->
+  <div id="mobile-menu" class="fixed inset-0 z-40 bg-dark-base/98 backdrop-blur-xl flex flex-col items-center justify-center">
+    <div class="flex flex-col items-center gap-8">
+      <a href="/es/" class="text-2xl font-serif tracking-[0.15em] uppercase text-txt-dark/70 hover:text-brand-blue" style="transition: color 0.3s;">Inicio</a>
+      <div class="w-8 h-px bg-brand-blue/20"></div>
+      <a href="/es/yates-en-venta/" class="text-2xl font-serif tracking-[0.15em] uppercase text-txt-dark/70 hover:text-brand-blue" style="transition: color 0.3s;">Embarcaciones</a>
+      <div class="w-8 h-px bg-brand-blue/20"></div>
+      <a href="/es/#nosotros" class="text-2xl font-serif tracking-[0.15em] uppercase text-txt-dark/70 hover:text-brand-blue" style="transition: color 0.3s;">Nosotros</a>
+      <div class="w-8 h-px bg-brand-blue/20"></div>
+      <a href="/es/#contacto" class="text-2xl font-serif tracking-[0.15em] uppercase text-txt-dark/70 hover:text-brand-blue" style="transition: color 0.3s;">Contacto</a>
+      <div class="mt-4">
+        <a href="tel:+34609865215" class="btn-primary">Llamar</a>
+      </div>
+    </div>
+  </div>
+
+  <main>
+
+  <!-- ═══ HERO ═══ -->
+  <section class="relative min-h-[70svh] flex items-center overflow-hidden pt-20">
+    <div class="absolute inset-0">
+      <img src="/assets/velero.jpg" alt="Embarcación en el Mediterráneo" class="w-full h-full object-cover hero-ken-burns" style="object-position: 50% 40%;" loading="eager">
+      <div class="absolute inset-0" style="background: linear-gradient(180deg, rgba(11,18,32,0.92) 0%, rgba(11,18,32,0.70) 40%, rgba(11,18,32,0.45) 70%, rgba(11,18,32,0.80) 100%);"></div>
+      <div class="absolute inset-0 grain-overlay"></div>
+    </div>
+    <div class="relative z-10 w-full max-w-4xl mx-auto px-6 sm:px-8 lg:px-12 text-center py-20">
+      <span class="section-label text-brand-gold/60 mb-5 block reveal" data-delay="100">Brokerage náutico · El Masnou, Barcelona</span>
+      <h1 class="font-serif text-[2.2rem] sm:text-5xl md:text-6xl text-white leading-[1.05] tracking-[-0.03em] font-light reveal" data-delay="200">Su embarcación merece<br>una representación<br>a la altura</h1>
+      <p class="text-brand-gold/70 text-sm tracking-[0.25em] uppercase mt-6 font-light reveal" data-delay="300">Jordi Sentíes · Broker náutico desde 1976</p>
+      <p class="text-txt-dark/75 text-[15px] sm:text-base leading-[1.7] mt-5 max-w-2xl mx-auto font-light reveal" data-delay="400" style="text-shadow: 0 2px 12px rgba(11,18,32,0.8);">Gestión profesional, discreta y rigurosa de la venta de embarcaciones de valor. Más de cinco décadas de criterio y relaciones en el mercado mediterráneo.</p>
+      <div class="mt-10 reveal" data-delay="500">
+        <a href="#formulario" class="btn-gold">Solicitar valoración confidencial</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ VALUE PROPS ═══ -->
+  <section class="py-20 sm:py-24 bg-dark-base border-t border-dark-border/50">
+    <div class="max-w-6xl mx-auto px-6 sm:px-8 lg:px-12">
+      <div class="text-center max-w-2xl mx-auto mb-16 reveal">
+        <span class="section-label text-brand-blue/60 mb-4 block">Por qué Sent-Yacht</span>
+        <h2 class="font-serif text-3xl sm:text-4xl text-txt-dark tracking-[-0.03em] leading-[1.1]">No es solo vender. Es representar.</h2>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div class="text-center reveal">
+          <div class="w-14 h-14 mx-auto rounded-sm border border-brand-gold/20 flex items-center justify-center mb-6">
+            <svg class="w-6 h-6 text-brand-gold/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+          </div>
+          <h3 class="font-serif text-xl text-txt-dark mb-3">Criterio y experiencia</h3>
+          <p class="text-txt-dark-2/60 text-[15px] font-light leading-[1.7]">Más de cinco décadas asesorando operaciones de compra-venta. Conocemos el mercado, los astilleros y las valoraciones reales.</p>
+        </div>
+        <div class="text-center reveal" data-delay="100">
+          <div class="w-14 h-14 mx-auto rounded-sm border border-brand-gold/20 flex items-center justify-center mb-6">
+            <svg class="w-6 h-6 text-brand-gold/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+          </div>
+          <h3 class="font-serif text-xl text-txt-dark mb-3">Posicionamiento premium</h3>
+          <p class="text-txt-dark-2/60 text-[15px] font-light leading-[1.7]">Su embarcación se presenta con el nivel visual y comercial que merece. Fotografía profesional, ficha detallada y difusión selectiva.</p>
+        </div>
+        <div class="text-center reveal" data-delay="200">
+          <div class="w-14 h-14 mx-auto rounded-sm border border-brand-gold/20 flex items-center justify-center mb-6">
+            <svg class="w-6 h-6 text-brand-gold/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+          </div>
+          <h3 class="font-serif text-xl text-txt-dark mb-3">Trato directo y discreto</h3>
+          <p class="text-txt-dark-2/60 text-[15px] font-light leading-[1.7]">Sin intermediarios innecesarios. Un interlocutor único que conoce su embarcación y gestiona cada paso de la operación.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ LEAD FORM ═══ -->
+  <section id="formulario" class="py-20 lg:py-28 bg-dark-surface relative overflow-hidden">
+    <div class="absolute inset-0 grain-overlay"></div>
+    <div class="max-w-3xl mx-auto px-6 sm:px-8 lg:px-12 relative">
+      <div class="text-center mb-12 reveal">
+        <span class="section-label text-brand-gold/50 mb-4 block">Primer paso</span>
+        <h2 class="font-serif text-3xl sm:text-4xl text-txt-dark tracking-[-0.03em] leading-[1.1] mb-5">Cuéntenos sobre su embarcación</h2>
+        <p class="text-txt-dark-2/60 leading-[1.8] text-[15px] font-light max-w-xl mx-auto">Sin compromiso. Nos pondremos en contacto para conocer su situación, valorar la embarcación y explicarle nuestro proceso de trabajo.</p>
+      </div>
+
+      <form id="lead-form" class="space-y-5 reveal" data-delay="100">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label for="nombre" class="block text-[12px] text-txt-dark-2/50 uppercase tracking-[0.15em] mb-2 font-light">Nombre *</label>
+            <input type="text" id="nombre" name="nombre" required class="form-input" placeholder="Su nombre completo">
+          </div>
+          <div>
+            <label for="email" class="block text-[12px] text-txt-dark-2/50 uppercase tracking-[0.15em] mb-2 font-light">Email *</label>
+            <input type="email" id="email" name="email" required class="form-input" placeholder="email@ejemplo.com">
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label for="telefono" class="block text-[12px] text-txt-dark-2/50 uppercase tracking-[0.15em] mb-2 font-light">Teléfono</label>
+            <input type="tel" id="telefono" name="telefono" class="form-input" placeholder="+34 600 000 000">
+          </div>
+          <div>
+            <label for="interes" class="block text-[12px] text-txt-dark-2/50 uppercase tracking-[0.15em] mb-2 font-light">Motivo de la consulta</label>
+            <select id="interes" name="interes" class="form-input">
+              <option value="">Indique su necesidad</option>
+              <option value="venta-barco-motor">Venta de embarcación a motor</option>
+              <option value="venta-velero">Venta de velero</option>
+              <option value="compra-embarcacion">Adquisición de embarcación</option>
+              <option value="valoracion">Valoración profesional</option>
+              <option value="asesoria">Asesoramiento náutico</option>
+              <option value="otro">Otra consulta</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label for="mensaje" class="block text-[12px] text-txt-dark-2/50 uppercase tracking-[0.15em] mb-2 font-light">Mensaje</label>
+          <textarea id="mensaje" name="mensaje" rows="4" class="form-input" style="resize: vertical;" placeholder="Descríbanos brevemente su embarcación o consulta: marca, modelo, año, eslora, puerto..."></textarea>
+        </div>
+        <div class="flex items-start gap-3 pt-2 pb-1 border-t border-dark-border/30 mt-2">
+          <input type="checkbox" id="privacidad" name="privacidad" required class="mt-0.5 w-4 h-4 accent-brand-blue flex-shrink-0">
+          <label for="privacidad" class="text-txt-dark-2/40 text-[12px] font-light leading-relaxed">He leído y acepto la <a href="/es/politica-de-privacidad/" class="text-txt-dark-2/60 underline hover:text-brand-blue" style="transition: color 0.3s;">política de privacidad</a>. Sus datos se tratarán exclusivamente para gestionar esta consulta.</label>
+        </div>
+        <div class="pt-3">
+          <button type="submit" id="submit-btn" class="btn-gold w-full sm:w-auto">
+            <span id="submit-text">Solicitar valoración confidencial</span>
+            <svg id="submit-spinner" class="w-5 h-5 hidden" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" stroke-dasharray="32" stroke-linecap="round"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.8s" repeatCount="indefinite"/></circle></svg>
+          </button>
+        </div>
+      </form>
+
+      <!-- Success message -->
+      <div id="form-success" class="hidden text-center py-12 reveal">
+        <div class="w-16 h-16 mx-auto rounded-full border-2 border-brand-gold/40 flex items-center justify-center mb-6">
+          <svg class="w-8 h-8 text-brand-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+        </div>
+        <h3 class="font-serif text-2xl text-txt-dark mb-3">Consulta recibida</h3>
+        <p class="text-txt-dark-2/60 text-[15px] font-light leading-[1.7] max-w-md mx-auto">Gracias por confiar en Sent-Yacht. Nos pondremos en contacto con usted en un plazo máximo de 48 horas.</p>
+        <a href="/es/" class="inline-flex items-center gap-2 text-sm font-light text-txt-dark-2/60 hover:text-brand-blue tracking-[0.1em] uppercase mt-8" style="transition: color 0.3s;">
+          Volver al inicio
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+        </a>
+      </div>
+
+      <!-- Error message -->
+      <div id="form-error" class="hidden mt-4 p-4 border border-red-500/20 bg-red-500/5 rounded-sm">
+        <p class="text-red-400/80 text-sm font-light">Ha ocurrido un error al enviar su consulta. Por favor, inténtelo de nuevo o contacte directamente al <a href="tel:+34609865215" class="underline">+34 609 865 215</a>.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ CTA FINAL ═══ -->
+  <section class="py-16 bg-dark-base border-t border-dark-border/30">
+    <div class="max-w-4xl mx-auto px-6 sm:px-8 text-center reveal">
+      <p class="text-txt-dark-2/50 text-[15px] font-light leading-[1.7] mb-6">Si prefiere un contacto directo e inmediato:</p>
+      <div class="flex flex-col sm:flex-row justify-center gap-4">
+        <a href="tel:+34609865215" class="btn-outline">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+          +34 609 865 215
+        </a>
+        <a href="https://wa.me/34609865215?text=Hola%2C%20me%20gustar%C3%ADa%20información%20sobre%20el%20servicio%20de%20brokerage" target="_blank" rel="noopener" class="btn-outline">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.611.611l4.458-1.495A11.96 11.96 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.387 0-4.592-.838-6.316-2.234l-.44-.367-3.265 1.094 1.094-3.265-.367-.44A9.96 9.96 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>
+          WhatsApp
+        </a>
+        <a href="mailto:jordi@sentyacht.es?subject=Consulta%20brokerage" class="btn-outline">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+          Email
+        </a>
+      </div>
+    </div>
+  </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-dark-border/30 bg-dark-base">
+    <div class="max-w-7xl mx-auto px-6 lg:px-8 py-16">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-12 items-start">
+        <div>
+          <a href="/es/" class="inline-block mb-4">
+            <img src="/assets/logo.png" alt="SentYacht" class="h-7">
+          </a>
+          <p class="text-txt-dark-2/50 text-sm font-light leading-relaxed">Grandes embarcaciones desde 1976.<br>El Masnou, Barcelona.</p>
+        </div>
+        <div>
+          <h4 class="text-xs tracking-[0.2em] uppercase text-txt-dark-2/50 mb-5">Navegación</h4>
+          <div class="flex flex-col gap-3">
+            <a href="/es/" class="text-txt-dark-2/60 text-sm font-light hover:text-brand-blue" style="transition: color 0.3s;">Inicio</a>
+            <a href="/es/yates-en-venta/" class="text-txt-dark-2/60 text-sm font-light hover:text-brand-blue" style="transition: color 0.3s;">Embarcaciones</a>
+            <a href="/es/#nosotros" class="text-txt-dark-2/60 text-sm font-light hover:text-brand-blue" style="transition: color 0.3s;">Nosotros</a>
+            <a href="/es/#contacto" class="text-txt-dark-2/60 text-sm font-light hover:text-brand-blue" style="transition: color 0.3s;">Contacto</a>
+          </div>
+        </div>
+        <div>
+          <h4 class="text-xs tracking-[0.2em] uppercase text-txt-dark-2/50 mb-5">Contacto</h4>
+          <div class="flex flex-col gap-3 text-sm font-light">
+            <p class="text-txt-dark-2/60">Port Esportiu, Local 49</p>
+            <p class="text-txt-dark-2/60">El Masnou, 08320, Barcelona</p>
+            <a href="tel:+34609865215" class="text-txt-dark-2/60 hover:text-brand-blue" style="transition: color 0.3s;">+34 609 865 215</a>
+            <a href="mailto:jordi@sentyacht.es" class="text-txt-dark-2/60 hover:text-brand-blue" style="transition: color 0.3s;">jordi@sentyacht.es</a>
+          </div>
+        </div>
+        <div>
+          <h4 class="text-xs tracking-[0.2em] uppercase text-txt-dark-2/50 mb-5">Legal</h4>
+          <div class="flex flex-col gap-3 text-sm font-light">
+            <a href="/es/aviso-legal/" class="text-txt-dark-2/60 hover:text-brand-blue" style="transition: color 0.3s;">Aviso Legal</a>
+            <a href="/es/politica-de-privacidad/" class="text-txt-dark-2/60 hover:text-brand-blue" style="transition: color 0.3s;">Política de Privacidad</a>
+            <a href="/es/politica-de-cookies/" class="text-txt-dark-2/60 hover:text-brand-blue" style="transition: color 0.3s;">Política de Cookies</a>
+          </div>
+        </div>
+      </div>
+      <div class="mt-16 pt-8 border-t border-dark-border/20 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <p class="text-txt-dark-2/25 text-xs font-light">&copy; 2026 SentYacht. Todos los derechos reservados.</p>
+        <p class="text-txt-dark-2/25 text-xs font-light">Puerto Deportivo El Masnou, Barcelona</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/shared.js"></script>
+  <script>
+    // ── Form submission ──
+    const form = document.getElementById('lead-form');
+    const successDiv = document.getElementById('form-success');
+    const errorDiv = document.getElementById('form-error');
+    const submitBtn = document.getElementById('submit-btn');
+    const submitText = document.getElementById('submit-text');
+    const submitSpinner = document.getElementById('submit-spinner');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorDiv.classList.add('hidden');
+
+      const data = {
+        nombre: form.nombre.value.trim(),
+        email: form.email.value.trim(),
+        telefono: form.telefono.value.trim(),
+        interes: form.interes.value,
+        mensaje: form.mensaje.value.trim(),
+        origen: 'web:sentyacht-vender',
+        timestamp: new Date().toISOString(),
+      };
+
+      // If endpoint is configured, send to backend
+      if (LEAD_ENDPOINT) {
+        submitBtn.disabled = true;
+        submitText.textContent = 'Enviando...';
+        submitSpinner.classList.remove('hidden');
+
+        try {
+          const res = await fetch(LEAD_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          form.classList.add('hidden');
+          successDiv.classList.remove('hidden');
+        } catch (err) {
+          console.error('Lead submission error:', err);
+          errorDiv.classList.remove('hidden');
+          submitBtn.disabled = false;
+          submitText.textContent = 'Solicitar contacto';
+          submitSpinner.classList.add('hidden');
+        }
+      } else {
+        // No endpoint configured — fallback to mailto
+        const subject = encodeURIComponent('Nueva consulta de brokerage — ' + data.nombre);
+        const body = encodeURIComponent(
+          `Nombre: ${data.nombre}\nEmail: ${data.email}\nTeléfono: ${data.telefono}\nInterés: ${data.interes}\n\nMensaje:\n${data.mensaje}`
+        );
+        window.location.href = `mailto:jordi@sentyacht.es?subject=${subject}&body=${body}`;
+        form.classList.add('hidden');
+        successDiv.classList.remove('hidden');
+      }
+    });
+  </script>
+
+</body>
+</html>

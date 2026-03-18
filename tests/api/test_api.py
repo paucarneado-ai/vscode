@@ -40,7 +40,7 @@ def test_create_lead_valid():
     lead = data["lead"]
     assert lead["name"] == "Test User"
     assert lead["email"] == "test@example.com"
-    assert lead["score"] == 70  # base 50 + source "test" 10 + notes 10
+    assert lead["score"] == 45  # base 30 + source "test" 5 + has_notes 10
     assert "id" in lead
     assert "created_at" in lead
 
@@ -85,7 +85,7 @@ def test_get_lead_pack():
     assert response.status_code == 200
     data = response.json()
     assert data["lead_id"] == lead_id
-    assert data["rating"] == "medium"  # score 70 -> medium
+    assert data["rating"] == "low"  # score 45 -> low
     assert data["name"] == "Test User"
     assert "summary" in data
     assert "created_at" in data
@@ -106,7 +106,7 @@ def test_get_lead_pack_html():
     body = response.text
     assert "Test User" in body
     assert "test@example.com" in body
-    assert "medium" in body
+    assert "low" in body
 
 
 def test_get_lead_pack_html_not_found():
@@ -124,7 +124,7 @@ def test_get_lead_pack_text():
     body = response.text
     assert "Test User" in body
     assert "test@example.com" in body
-    assert "medium" in body
+    assert "low" in body
 
 
 def test_get_lead_pack_text_not_found():
@@ -143,7 +143,7 @@ def test_get_lead_delivery():
     assert data["delivery_status"] == "generated"
     assert data["channel"] == "api"
     assert "generated_at" in data
-    assert data["pack"]["rating"] == "medium"
+    assert data["pack"]["rating"] == "low"
     assert "message" in data
 
 
@@ -214,11 +214,11 @@ def test_list_leads_filter_by_source_no_match():
 
 def test_list_leads_filter_by_min_score():
     client.post("/leads", json=VALID_LEAD)
-    response = client.get("/leads", params={"min_score": 60})
+    response = client.get("/leads", params={"min_score": 40})
     assert response.status_code == 200
     data = response.json()
     assert len(data) >= 1
-    assert all(lead["score"] >= 60 for lead in data)
+    assert all(lead["score"] >= 40 for lead in data)
 
 
 def test_list_leads_with_limit():
@@ -267,12 +267,12 @@ def test_list_leads_pagination_order():
 def test_list_leads_with_combined_filters():
     client.post("/leads", json={**VALID_LEAD, "source": "combo"})
     response = client.get(
-        "/leads", params={"source": "combo", "min_score": 60, "limit": 5, "offset": 0}
+        "/leads", params={"source": "combo", "min_score": 40, "limit": 5, "offset": 0}
     )
     assert response.status_code == 200
     data = response.json()
     assert len(data) >= 1
-    assert all(lead["source"] == "combo" and lead["score"] >= 60 for lead in data)
+    assert all(lead["source"] == "combo" and lead["score"] >= 40 for lead in data)
     assert len(data) <= 5
 
 
@@ -356,7 +356,7 @@ def test_create_lead_normalization_preserves_scoring():
     assert response.status_code == 200
     lead = response.json()["lead"]
     assert lead["source"] == "test"
-    assert lead["score"] == 70  # same as VALID_LEAD with source="test"
+    assert lead["score"] == 45  # same as VALID_LEAD with source="test"
 
 
 def test_create_lead_duplicate_returns_409():
@@ -522,23 +522,23 @@ def test_leads_summary_values():
 
 
 def test_leads_summary_buckets_with_known_scores():
-    # source "test" + notes -> score 70 (high: >= 60)
+    # source "test" + plain notes -> score 45 (medium: 40-59)
     client.post("/leads", json={
         "name": "BucketHi", "email": "buckhi@bucket.com",
         "source": "test", "notes": "interested in demo",
     })
-    # source with no bonus + no notes -> score 50 (medium: 40-59)
+    # source with no bonus + no notes -> score 30 (low: < 40)
     client.post("/leads", json={
-        "name": "BucketMed", "email": "buckmed@bucket.com",
+        "name": "BucketLow", "email": "bucklow@bucket.com",
         "source": "bucket_unknown", "notes": "",
     })
     resp = client.get("/leads/summary", params={"source": "bucket_unknown"})
     data = resp.json()
-    assert data["medium_score_count"] >= 1
+    assert data["low_score_count"] >= 1
 
     resp = client.get("/leads/summary", params={"source": "test"})
     data = resp.json()
-    assert data["high_score_count"] >= 1
+    assert data["medium_score_count"] >= 1
 
 
 def test_leads_summary_buckets_filtered_by_source():
@@ -573,7 +573,7 @@ def test_leads_summary_filtered_by_source():
 
 
 def test_leads_summary_filtered_by_min_score():
-    # Create a lead with known score (source "test" + notes -> 70)
+    # Create a lead with known score (source "test" + plain notes -> 45)
     client.post("/leads", json={
         "name": "ScoreSum", "email": "scoresum@summary.com",
         "source": "test", "notes": "interested in demo",
@@ -583,7 +583,7 @@ def test_leads_summary_filtered_by_min_score():
     assert resp_high.json()["total_leads"] == 0
 
     # With low min_score, it's included
-    resp_low = client.get("/leads/summary", params={"min_score": 60})
+    resp_low = client.get("/leads/summary", params={"min_score": 40})
     assert resp_low.json()["total_leads"] >= 1
 
 
@@ -1661,3 +1661,178 @@ def test_instruction_matches_next_action():
     data = resp.json()
     for item in data:
         assert item["instruction"] == KNOWN_INSTRUCTIONS[item["next_action"]]
+
+
+# --- Scoring discrimination tests ---
+
+
+def test_scoring_no_notes_is_base():
+    from apps.api.services.scoring import calculate_lead_score
+    assert calculate_lead_score("web:sentyacht", None) == 30
+
+
+def test_scoring_plain_notes_adds_10():
+    from apps.api.services.scoring import calculate_lead_score
+    assert calculate_lead_score("web:sentyacht", "just text") == 40
+
+
+def test_scoring_high_value_boat_type():
+    from apps.api.services.scoring import calculate_lead_score
+    notes = "Interés: Yate a motor — 8m"
+    score = calculate_lead_score("web:sentyacht-vender", notes)
+    assert score == 50  # 30 base + 10 notes + 10 high_value_type
+
+
+def test_scoring_eslora_bonus():
+    from apps.api.services.scoring import calculate_lead_score
+    notes = "Interés: Lancha a motor — 12m"
+    score = calculate_lead_score("web:sentyacht-vender", notes)
+    assert score == 50  # 30 + 10 notes + 10 eslora (lancha not high-value)
+
+
+def test_scoring_price_is_strong_signal():
+    from apps.api.services.scoring import calculate_lead_score
+    notes = "Interés: Velero\nPrecio orientativo: 200000"
+    score = calculate_lead_score("web:sentyacht-vender", notes)
+    assert score == 70  # 30 + 10 notes + 10 high_value + 15 price + 5 detail(price)
+
+
+def test_scoring_full_details_maximizes():
+    from apps.api.services.scoring import calculate_lead_score
+    notes = (
+        "Interés: Yate a motor — 18\n"
+        "Marca/modelo: Azimut 62\n"
+        "Año: 2008\n"
+        "Puerto: Garraf\n"
+        "Precio orientativo: 3200000"
+    )
+    score = calculate_lead_score("web:sentyacht-vender", notes)
+    # 30 + 10 notes + 10 high_value + 10 eslora + 15 price + 20 details(4x5)
+    assert score == 95
+
+
+def test_scoring_test_source_bonus():
+    from apps.api.services.scoring import calculate_lead_score
+    assert calculate_lead_score("test", "some notes") == 45  # 30 + 5 test + 10 notes
+
+
+def test_scoring_capped_at_100():
+    from apps.api.services.scoring import calculate_lead_score
+    # Even with everything, should never exceed 100
+    notes = (
+        "Interés: Yate a motor — 50m\n"
+        "Marca/modelo: Sunseeker 155\n"
+        "Año: 2024\n"
+        "Puerto: Monaco\n"
+        "Precio orientativo: 50000000"
+    )
+    score = calculate_lead_score("test", notes)
+    assert score <= 100
+
+
+# --- Web intake endpoint ---
+
+VALID_INTAKE = {
+    "nombre": "María García",
+    "email": "maria@intake-test.com",
+    "telefono": "+34 612 345 678",
+    "interes": "Yate a motor",
+    "mensaje": "Quiero vender mi barco de 12m",
+    "origen": "web:sentyacht-vender",
+}
+
+
+def test_intake_web_creates_lead():
+    resp = client.post("/leads/intake/web", json=VALID_INTAKE)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "accepted"
+    assert "lead_id" in data
+
+
+def test_intake_web_lead_persists_with_correct_fields():
+    lead_id = client.post("/leads/intake/web", json={
+        **VALID_INTAKE, "email": "persist@intake-test.com",
+    }).json()["lead_id"]
+    lead = client.get(f"/leads/{lead_id}").json()
+    assert lead["name"] == "María García"
+    assert lead["email"] == "persist@intake-test.com"
+    assert lead["source"] == "web:sentyacht-vender"
+    assert "Teléfono: +34 612 345 678" in lead["notes"]
+    assert "Interés: Yate a motor" in lead["notes"]
+    assert "Mensaje: Quiero vender mi barco de 12m" in lead["notes"]
+
+
+def test_intake_web_scores_lead():
+    lead_id = client.post("/leads/intake/web", json={
+        **VALID_INTAKE, "email": "scored@intake-test.com",
+    }).json()["lead_id"]
+    lead = client.get(f"/leads/{lead_id}").json()
+    assert lead["score"] == 50  # base 30 + has_notes 10 + high_value_type 10
+
+
+def test_intake_web_duplicate_returns_409():
+    email = "dup-intake@intake-test.com"
+    client.post("/leads/intake/web", json={**VALID_INTAKE, "email": email})
+    resp = client.post("/leads/intake/web", json={**VALID_INTAKE, "email": email})
+    assert resp.status_code == 409
+    assert resp.json()["status"] == "duplicate"
+
+
+def test_intake_web_default_origen():
+    resp = client.post("/leads/intake/web", json={
+        "nombre": "Default Origen",
+        "email": "defaultorigen@intake-test.com",
+        "telefono": "+34 600 000 000",
+        "interes": "Velero",
+    })
+    assert resp.status_code == 200
+    lead_id = resp.json()["lead_id"]
+    lead = client.get(f"/leads/{lead_id}").json()
+    assert lead["source"] == "web:sentyacht"
+
+
+def test_intake_web_mensaje_optional():
+    resp = client.post("/leads/intake/web", json={
+        "nombre": "Sin Mensaje",
+        "email": "sinmensaje@intake-test.com",
+        "telefono": "+34 600 000 001",
+        "interes": "Catamarán de vela",
+    })
+    assert resp.status_code == 200
+    lead_id = resp.json()["lead_id"]
+    lead = client.get(f"/leads/{lead_id}").json()
+    assert "Mensaje:" not in lead["notes"]
+
+
+def test_intake_web_missing_required_returns_422():
+    resp = client.post("/leads/intake/web", json={"nombre": "Solo nombre"})
+    assert resp.status_code == 422
+
+
+def test_intake_web_invalid_email_returns_422():
+    resp = client.post("/leads/intake/web", json={
+        **VALID_INTAKE, "email": "not-an-email",
+    })
+    assert resp.status_code == 422
+
+
+def test_intake_web_normalizes_origen():
+    resp = client.post("/leads/intake/web", json={
+        **VALID_INTAKE, "email": "normorg@intake-test.com",
+        "origen": "  WEB:Custom  ",
+    })
+    lead_id = resp.json()["lead_id"]
+    lead = client.get(f"/leads/{lead_id}").json()
+    assert lead["source"] == "web:custom"
+
+
+def test_intake_web_does_not_break_webhook():
+    """Existing webhook still works after adding intake."""
+    resp = client.post("/leads/webhook/test-provider", json={
+        "name": "Webhook Still Works",
+        "email": "webhook-post-intake@test.com",
+        "notes": "after intake",
+    })
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "accepted"

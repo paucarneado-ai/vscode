@@ -16,6 +16,7 @@ from apps.api.schemas import (
     LeadPackResponse,
     LeadResponse,
     WebhookLeadPayload,
+    WebIntakePayload,
     WorklistGroup,
     WorklistResponse,
 )
@@ -101,6 +102,36 @@ def ingest_leads(items: list[LeadCreate]) -> dict:
         "duplicates": duplicates,
         "errors": errors,
     }
+
+
+@router.post("/leads/intake/web")
+def web_intake(payload: WebIntakePayload) -> dict:
+    source = (payload.origen or "web:sentyacht").strip().lower()
+    if not source:
+        source = "web:sentyacht"
+
+    notes_lines = []
+    if payload.telefono:
+        notes_lines.append(f"Teléfono: {payload.telefono}")
+    if payload.interes:
+        notes_lines.append(f"Interés: {payload.interes}")
+    if payload.mensaje:
+        notes_lines.append(f"Mensaje: {payload.mensaje}")
+    notes = "\n".join(notes_lines) if notes_lines else None
+
+    lead_create = LeadCreate(
+        name=payload.nombre,
+        email=payload.email,
+        source=source,
+        notes=notes,
+    )
+    result, status = _create_lead_internal(lead_create)
+    if status == 409:
+        return JSONResponse(
+            status_code=409,
+            content={"status": "duplicate", "lead_id": result.lead.id},
+        )
+    return {"status": "accepted", "lead_id": result.lead.id}
 
 
 @router.post("/leads/webhook/{provider}")

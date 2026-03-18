@@ -30,7 +30,7 @@ if [ "$SYNC_MODE" = "rsync" ]; then
     "${REPO_ROOT}/apps/" "root@${VPS_IP}:/home/openclaw/app/apps/"
   rsync -avz "${REPO_ROOT}/requirements.txt" "root@${VPS_IP}:/home/openclaw/app/"
 
-  echo "[2/6] Syncing static site (vertical-specific)..."
+  echo "[2/6] Syncing static site..."
   rsync -avz --delete \
     "${REPO_ROOT}/static/site/" "root@${VPS_IP}:/home/sentyacht/site/"
 
@@ -49,7 +49,7 @@ else
   # Remove __pycache__ that scp copied
   $SSH 'find /home/openclaw/app/apps -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null; true'
 
-  echo "[2/6] Copying static site (vertical-specific) via scp..."
+  echo "[2/6] Copying static site via scp..."
   $SSH 'rm -rf /home/sentyacht/site'
   scp -r "${REPO_ROOT}/static/site" "root@${VPS_IP}:/home/sentyacht/"
 
@@ -82,12 +82,20 @@ $SSH 'cp /home/openclaw/deploy/systemd/openclaw-api.service /etc/systemd/system/
   systemctl enable openclaw-api && \
   systemctl restart openclaw-api'
 
-# Caddy staging config (IP-only, no HTTPS) — heredoc via local stdin
+# Caddy staging config — restricted public surface
 $SSH 'cat > /etc/caddy/Caddyfile' << 'CADDYEOF'
 :8080 {
-    handle /api/* {
+    @intake {
+        method POST
+        path /api/leads/intake/web
+    }
+    handle @intake {
         uri strip_prefix /api
         reverse_proxy localhost:8000
+    }
+
+    handle /api/* {
+        respond 403
     }
 
     handle {
@@ -126,11 +134,11 @@ check() {
 # Wait for uvicorn to start
 sleep 2
 
-check "API health"           "http://127.0.0.1:8000/health"      "200"
-check "Home (/)"             "http://127.0.0.1:8080/"              "200"
-check "Landing (/vender/)"   "http://127.0.0.1:8080/vender/"      "200"
-check "CSS (brand.css)"      "http://127.0.0.1:8080/css/brand.css" "200"
-check "API via Caddy"        "http://127.0.0.1:8080/api/health"    "200"
+check "API health (direct)"  "http://127.0.0.1:8000/health"                "200"
+check "Home (/)"             "http://127.0.0.1:8080/"                       "200"
+check "Home ES (/es/)"       "http://127.0.0.1:8080/es/"                    "200"
+check "Landing"              "http://127.0.0.1:8080/es/vender-mi-barco/"    "200"
+check "API blocked"          "http://127.0.0.1:8080/api/health"             "403"
 
 set -e
 

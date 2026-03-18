@@ -5,13 +5,22 @@
 # or use the VPS IP directly. Caddy will skip HTTPS for bare IPs.
 
 sentyacht.com {
-    # API — reverse proxy to uvicorn (strip /api prefix)
-    handle /api/* {
+    # Public API — only POST /api/leads/intake/web is exposed
+    @intake {
+        method POST
+        path /api/leads/intake/web
+    }
+    handle @intake {
         uri strip_prefix /api
         reverse_proxy localhost:8000
     }
 
-    # Static files — single root serves / and /vender/ automatically
+    # Block all other /api/* requests
+    handle /api/* {
+        respond 403
+    }
+
+    # Static files — serves / and /vender/
     handle {
         file_server {
             root /home/sentyacht/site
