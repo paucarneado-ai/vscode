@@ -1,0 +1,82 @@
+rules:
+
+  # --- Caddy surface protection ---
+  # These use multiline regex to check the full Caddyfile block context
+
+  - id: caddy-permissive-api-proxy
+    pattern-regex: "handle /api/\\*\\s*\\{\\s*uri strip_prefix"
+    paths:
+      include:
+        - "**/*Caddyfile*"
+        - "**/deploy-staging.sh"
+    message: >
+      Permissive /api/* proxy detected: strips prefix and proxies directly
+      without @intake restriction. The correct pattern requires an @intake
+      matcher for POST /api/leads/intake/web only, with handle /api/* {
+      respond 403 } for everything else. This was a real incident on
+      2026-03-17 when deploy-staging.sh overwrote the Caddyfile.
+    severity: ERROR
+    languages: [generic]
+    metadata:
+      category: security
+      incident: "2026-03-17 Caddyfile overwrite exposed /api/health"
+
+  # --- Backend intake contract ---
+
+  - id: intake-telefono-required
+    pattern: |
+      class WebIntakePayload(BaseModel):
+          ...
+          telefono: str = Field(...)
+          ...
+    paths:
+      include:
+        - "**/schemas.py"
+    message: >
+      telefono must be optional (str | None = None), not required.
+      The legacy form does not require it. Making it required caused
+      422 errors on form submit (2026-03-18 incident).
+    severity: ERROR
+    languages: [python]
+    metadata:
+      category: contract
+      incident: "2026-03-18 form 422 bug"
+
+  - id: intake-interes-required
+    pattern: |
+      class WebIntakePayload(BaseModel):
+          ...
+          interes: str = Field(...)
+          ...
+    paths:
+      include:
+        - "**/schemas.py"
+    message: >
+      interes must be optional (str | None = None), not required.
+      The legacy form does not require it. Making it required caused
+      422 errors on form submit (2026-03-18 incident).
+    severity: ERROR
+    languages: [python]
+    metadata:
+      category: contract
+      incident: "2026-03-18 form 422 bug"
+
+  # --- SQL injection guard ---
+
+  - id: sql-string-interpolation
+    patterns:
+      - pattern-either:
+          - pattern: $DB.execute("..." + $VAR)
+          - pattern: $DB.execute("...".format(...))
+          - pattern: $DB.execute("..." % $VAR)
+    paths:
+      include:
+        - "**/*.py"
+    message: >
+      SQL query uses string concatenation/format instead of parameterized
+      queries. Always use bind params (?). Per CLAUDE.md: "SQL siempre con
+      bind params (?). Nunca interpolacion."
+    severity: ERROR
+    languages: [python]
+    metadata:
+      category: security
