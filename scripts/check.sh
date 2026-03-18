@@ -21,10 +21,10 @@ step() {
   fi
 }
 
-step "Unit tests (158)" \
-  python -m pytest tests/api/test_api.py -q --tb=short
+step "Unit + integration tests" \
+  python -m pytest tests/api/ -q --tb=short
 
-step "Smoke tests (7)" \
+step "Smoke tests (E2E)" \
   python -m pytest tests/e2e/test_smoke.py -q --tb=short
 
 step "Semgrep (4 rules)" \

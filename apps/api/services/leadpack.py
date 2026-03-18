@@ -4,9 +4,9 @@ from apps.api.schemas import LeadPackResponse
 
 
 def get_rating(score: int) -> str:
-    if score < 50:
+    if score < 40:
         return "low"
-    if score < 75:
+    if score < 60:
         return "medium"
     return "high"
 

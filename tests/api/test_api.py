@@ -40,7 +40,7 @@ def test_create_lead_valid():
     lead = data["lead"]
     assert lead["name"] == "Test User"
     assert lead["email"] == "test@example.com"
-    assert lead["score"] == 45  # base 30 + source "test" 5 + has_notes 10
+    assert lead["score"] == 30  # base 20 + source "test" 5 + has_data 5
     assert "id" in lead
     assert "created_at" in lead
 
@@ -214,11 +214,11 @@ def test_list_leads_filter_by_source_no_match():
 
 def test_list_leads_filter_by_min_score():
     client.post("/leads", json=VALID_LEAD)
-    response = client.get("/leads", params={"min_score": 40})
+    response = client.get("/leads", params={"min_score": 25})
     assert response.status_code == 200
     data = response.json()
     assert len(data) >= 1
-    assert all(lead["score"] >= 40 for lead in data)
+    assert all(lead["score"] >= 25 for lead in data)
 
 
 def test_list_leads_with_limit():
@@ -267,12 +267,12 @@ def test_list_leads_pagination_order():
 def test_list_leads_with_combined_filters():
     client.post("/leads", json={**VALID_LEAD, "source": "combo"})
     response = client.get(
-        "/leads", params={"source": "combo", "min_score": 40, "limit": 5, "offset": 0}
+        "/leads", params={"source": "combo", "min_score": 25, "limit": 5, "offset": 0}
     )
     assert response.status_code == 200
     data = response.json()
     assert len(data) >= 1
-    assert all(lead["source"] == "combo" and lead["score"] >= 40 for lead in data)
+    assert all(lead["source"] == "combo" and lead["score"] >= 25 for lead in data)
     assert len(data) <= 5
 
 
@@ -356,7 +356,7 @@ def test_create_lead_normalization_preserves_scoring():
     assert response.status_code == 200
     lead = response.json()["lead"]
     assert lead["source"] == "test"
-    assert lead["score"] == 45  # same as VALID_LEAD with source="test"
+    assert lead["score"] == 30  # same as VALID_LEAD with source="test"
 
 
 def test_create_lead_duplicate_returns_409():
@@ -522,12 +522,12 @@ def test_leads_summary_values():
 
 
 def test_leads_summary_buckets_with_known_scores():
-    # source "test" + plain notes -> score 45 (medium: 40-59)
+    # source "test" + plain notes -> score 30 (low: < 50)
     client.post("/leads", json={
         "name": "BucketHi", "email": "buckhi@bucket.com",
         "source": "test", "notes": "interested in demo",
     })
-    # source with no bonus + no notes -> score 30 (low: < 40)
+    # source unknown + no notes -> score 20 (low)
     client.post("/leads", json={
         "name": "BucketLow", "email": "bucklow@bucket.com",
         "source": "bucket_unknown", "notes": "",
@@ -538,7 +538,7 @@ def test_leads_summary_buckets_with_known_scores():
 
     resp = client.get("/leads/summary", params={"source": "test"})
     data = resp.json()
-    assert data["medium_score_count"] >= 1
+    assert data["low_score_count"] >= 1  # test + plain notes = 30 = low
 
 
 def test_leads_summary_buckets_filtered_by_source():
@@ -583,7 +583,7 @@ def test_leads_summary_filtered_by_min_score():
     assert resp_high.json()["total_leads"] == 0
 
     # With low min_score, it's included
-    resp_low = client.get("/leads/summary", params={"min_score": 40})
+    resp_low = client.get("/leads/summary", params={"min_score": 25})
     assert resp_low.json()["total_leads"] >= 1
 
 
@@ -1238,7 +1238,7 @@ def test_source_dedup_consistent_after_normalization():
 # --- Operational contract ---
 
 
-OPERATIONAL_FIELDS = {"lead_id", "name", "source", "score", "rating", "next_action", "instruction", "alert", "summary", "created_at", "generated_at"}
+OPERATIONAL_FIELDS = {"lead_id", "name", "email", "source", "score", "status", "rating", "next_action", "instruction", "priority_reason", "alert", "summary", "phone", "created_at", "generated_at"}
 
 
 def test_operational_response_structure():
@@ -1300,8 +1300,9 @@ def test_operational_no_extra_fields():
     lead_id = resp.json()["lead"]["id"]
     op = client.get(f"/leads/{lead_id}/operational").json()
     assert "name" in op
+    assert "email" in op
     assert "created_at" in op
-    assert "email" not in op
+    assert "priority_reason" in op
     assert "notes" not in op
     assert "message" not in op
     assert "pack" not in op
@@ -1600,11 +1601,11 @@ def test_queue_does_not_break_actionable():
 
 
 KNOWN_INSTRUCTIONS = {
-    "send_to_client": "Send lead to client for prioritization",
-    "review_manually": "Review lead manually",
-    "request_more_info": "Request more information from lead",
-    "enrich_first": "Enrich lead data before further action",
-    "discard": "Discard lead — insufficient data",
+    "send_to_client": "Contactar al propietario. Lead cualificado con datos suficientes para primera conversacion.",
+    "review_manually": "Revisar datos antes de contactar. Hay informacion pero falta valorar si merece seguimiento directo.",
+    "request_more_info": "Pedir mas datos. El lead tiene poco detalle para evaluar interes real.",
+    "enrich_first": "Buscar informacion adicional. Datos insuficientes para actuar.",
+    "discard": "Descartar. Sin datos utiles.",
 }
 
 
@@ -1668,33 +1669,33 @@ def test_instruction_matches_next_action():
 
 def test_scoring_no_notes_is_base():
     from apps.api.services.scoring import calculate_lead_score
-    assert calculate_lead_score("web:sentyacht", None) == 30
+    assert calculate_lead_score("web:sentyacht", None) == 30  # 20 base + 10 high-quality source
 
 
-def test_scoring_plain_notes_adds_10():
+def test_scoring_plain_notes_adds_5():
     from apps.api.services.scoring import calculate_lead_score
-    assert calculate_lead_score("web:sentyacht", "just text") == 40
+    assert calculate_lead_score("web:sentyacht", "just text") == 35  # 20 + 10 source + 5 has_data
 
 
 def test_scoring_high_value_boat_type():
     from apps.api.services.scoring import calculate_lead_score
     notes = "Interés: Yate a motor — 8m"
     score = calculate_lead_score("web:sentyacht-vender", notes)
-    assert score == 50  # 30 base + 10 notes + 10 high_value_type
+    assert score == 45  # 20 + 10 source + 5 data + 10 high_value
 
 
 def test_scoring_eslora_bonus():
     from apps.api.services.scoring import calculate_lead_score
     notes = "Interés: Lancha a motor — 12m"
     score = calculate_lead_score("web:sentyacht-vender", notes)
-    assert score == 50  # 30 + 10 notes + 10 eslora (lancha not high-value)
+    assert score == 45  # 20 + 10 source + 5 data + 10 eslora
 
 
 def test_scoring_price_is_strong_signal():
     from apps.api.services.scoring import calculate_lead_score
     notes = "Interés: Velero\nPrecio orientativo: 200000"
     score = calculate_lead_score("web:sentyacht-vender", notes)
-    assert score == 70  # 30 + 10 notes + 10 high_value + 15 price + 5 detail(price)
+    assert score == 65  # 20 + 10 src + 5 data + 10 high_value + 15 price + 5 detail
 
 
 def test_scoring_full_details_maximizes():
@@ -1707,13 +1708,13 @@ def test_scoring_full_details_maximizes():
         "Precio orientativo: 3200000"
     )
     score = calculate_lead_score("web:sentyacht-vender", notes)
-    # 30 + 10 notes + 10 high_value + 10 eslora + 15 price + 20 details(4x5)
-    assert score == 95
+    # 20 + 10 src + 5 data + 10 high_value + 10 eslora + 15 price + 20 details
+    assert score == 90
 
 
 def test_scoring_test_source_bonus():
     from apps.api.services.scoring import calculate_lead_score
-    assert calculate_lead_score("test", "some notes") == 45  # 30 + 5 test + 10 notes
+    assert calculate_lead_score("test", "some notes") == 30  # 20 + 5 test + 5 data
 
 
 def test_scoring_capped_at_100():
@@ -1768,7 +1769,7 @@ def test_intake_web_scores_lead():
         **VALID_INTAKE, "email": "scored@intake-test.com",
     }).json()["lead_id"]
     lead = client.get(f"/leads/{lead_id}").json()
-    assert lead["score"] == 50  # base 30 + has_notes 10 + high_value_type 10
+    assert lead["score"] == 60  # 20 base + 10 src + 5 data + 10 phone + 10 high_value + 5 msg
 
 
 def test_intake_web_duplicate_returns_409():

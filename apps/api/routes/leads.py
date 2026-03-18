@@ -1,13 +1,12 @@
 import csv
 import io
 from datetime import datetime, timezone
-
-from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
-
-from apps.api.db import get_db
 from collections import defaultdict
 
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
+from apps.api.auth import require_api_key
+from apps.api.ratelimit import require_rate_limit
 from apps.api.schemas import (
     LeadCreate,
     LeadCreateResult,
@@ -15,66 +14,44 @@ from apps.api.schemas import (
     LeadOperationalSummary,
     LeadPackResponse,
     LeadResponse,
+    LeadStatusUpdate,
     WebhookLeadPayload,
     WebIntakePayload,
     WorklistGroup,
     WorklistResponse,
 )
-from apps.api.services.leadpack import (
-    build_summary,
-    get_rating,
-    render_lead_pack_html,
-    render_lead_pack_text,
+from apps.api.services.actions import ACTION_PRIORITY
+from apps.api.services.intake import (
+    create_lead as _create_lead_internal,
+    get_lead_by_id,
+    get_leads_summary_data,
+    InvalidStatusError,
+    normalize_web_intake,
+    normalize_webhook_payload,
+    query_leads,
+    query_leads_for_export,
+    update_lead_status,
+    ProviderValidationError,
+    SourceValidationError,
 )
-from apps.api.services.actions import determine_next_action, get_instruction, should_alert
-from apps.api.services.scoring import calculate_lead_score
+from apps.api.services.leadpack import render_lead_pack_html, render_lead_pack_text
+from apps.api.services.operational import (
+    get_actionable_leads as _get_actionable_leads,
+    get_lead_pack_by_id,
+    get_lead_operational_by_id,
+)
 
 
-router = APIRouter()
-
-
-def _create_lead_internal(payload: LeadCreate) -> tuple[LeadCreateResult, int]:
-    """Create a lead and return (result, http_status)."""
-    source = payload.source.strip().lower()
-    if not source:
-        raise HTTPException(status_code=422, detail="source cannot be empty or whitespace-only")
-    email = payload.email.strip().lower()
-
-    db = get_db()
-    existing = db.execute(
-        "SELECT * FROM leads WHERE email = ? AND source = ?", (email, source)
-    ).fetchone()
-    if existing is not None:
-        lead = LeadResponse(**dict(existing))
-        result = LeadCreateResult(
-            message="lead already exists",
-            lead=lead,
-            meta={"version": "v1", "status": "duplicate"},
-        )
-        return result, 409
-
-    score = calculate_lead_score(source, payload.notes)
-
-    cursor = db.execute(
-        "INSERT INTO leads (name, email, source, notes, score) VALUES (?, ?, ?, ?, ?)",
-        (payload.name, email, source, payload.notes, score),
-    )
-    db.commit()
-
-    row = db.execute("SELECT * FROM leads WHERE id = ?", (cursor.lastrowid,)).fetchone()
-    lead = LeadResponse(**dict(row))
-
-    result = LeadCreateResult(
-        message="lead received",
-        lead=lead,
-        meta={"version": "v1", "status": "accepted"},
-    )
-    return result, 200
+router = APIRouter(dependencies=[Depends(require_api_key)])
+public_router = APIRouter(dependencies=[Depends(require_rate_limit)])  # Public, rate-limited
 
 
 @router.post("/leads", response_model=LeadCreateResult)
 def create_lead(payload: LeadCreate) -> LeadCreateResult:
-    result, status = _create_lead_internal(payload)
+    try:
+        result, status = _create_lead_internal(payload)
+    except SourceValidationError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     if status == 409:
         return JSONResponse(status_code=409, content=result.model_dump())
     return result
@@ -104,27 +81,9 @@ def ingest_leads(items: list[LeadCreate]) -> dict:
     }
 
 
-@router.post("/leads/intake/web")
+@public_router.post("/leads/intake/web")
 def web_intake(payload: WebIntakePayload) -> dict:
-    source = (payload.origen or "web:sentyacht").strip().lower()
-    if not source:
-        source = "web:sentyacht"
-
-    notes_lines = []
-    if payload.telefono:
-        notes_lines.append(f"Teléfono: {payload.telefono}")
-    if payload.interes:
-        notes_lines.append(f"Interés: {payload.interes}")
-    if payload.mensaje:
-        notes_lines.append(f"Mensaje: {payload.mensaje}")
-    notes = "\n".join(notes_lines) if notes_lines else None
-
-    lead_create = LeadCreate(
-        name=payload.nombre,
-        email=payload.email,
-        source=source,
-        notes=notes,
-    )
+    lead_create = normalize_web_intake(payload)
     result, status = _create_lead_internal(lead_create)
     if status == 409:
         return JSONResponse(
@@ -136,13 +95,10 @@ def web_intake(payload: WebIntakePayload) -> dict:
 
 @router.post("/leads/webhook/{provider}")
 def webhook_ingest(provider: str, payload: WebhookLeadPayload) -> dict:
-    provider_clean = provider.strip().lower()
-    if not provider_clean:
-        raise HTTPException(status_code=422, detail="provider cannot be empty or whitespace-only")
-    source = f"webhook:{provider_clean}"
-    lead_create = LeadCreate(
-        name=payload.name, email=payload.email, source=source, notes=payload.notes
-    )
+    try:
+        lead_create = normalize_webhook_payload(provider, payload)
+    except ProviderValidationError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     result, status = _create_lead_internal(lead_create)
     if status == 409:
         return JSONResponse(
@@ -154,10 +110,12 @@ def webhook_ingest(provider: str, payload: WebhookLeadPayload) -> dict:
 
 @router.post("/leads/webhook/{provider}/batch")
 def webhook_ingest_batch(provider: str, items: list[WebhookLeadPayload]) -> dict:
-    provider_clean = provider.strip().lower()
-    if not provider_clean:
-        raise HTTPException(status_code=422, detail="provider cannot be empty or whitespace-only")
-    source = f"webhook:{provider_clean}"
+    try:
+        # Validate provider once, not per item
+        test_payload = WebhookLeadPayload(name="test", email="test@test.com")
+        normalize_webhook_payload(provider, test_payload)
+    except ProviderValidationError as e:
+        raise HTTPException(status_code=422, detail=str(e))
 
     created = 0
     duplicates = 0
@@ -165,9 +123,7 @@ def webhook_ingest_batch(provider: str, items: list[WebhookLeadPayload]) -> dict
 
     for i, item in enumerate(items):
         try:
-            lead_create = LeadCreate(
-                name=item.name, email=item.email, source=source, notes=item.notes
-            )
+            lead_create = normalize_webhook_payload(provider, item)
             _, status = _create_lead_internal(lead_create)
             if status == 200:
                 created += 1
@@ -184,51 +140,6 @@ def webhook_ingest_batch(provider: str, items: list[WebhookLeadPayload]) -> dict
     }
 
 
-def _build_where_clause(
-    source: str | None = None,
-    min_score: int | None = None,
-    q: str | None = None,
-) -> tuple[str, list[str | int]]:
-    conditions: list[str] = []
-    params: list[str | int] = []
-
-    if source is not None:
-        conditions.append("source = ?")
-        params.append(source)
-    if min_score is not None:
-        conditions.append("score >= ?")
-        params.append(min_score)
-    if q is not None:
-        pattern = f"%{q}%"
-        conditions.append("(name LIKE ? OR email LIKE ? OR notes LIKE ?)")
-        params.extend([pattern, pattern, pattern])
-
-    clause = " WHERE " + " AND ".join(conditions) if conditions else ""
-    return clause, params
-
-
-def _build_leads_query(
-    source: str | None = None,
-    min_score: int | None = None,
-    limit: int | None = None,
-    offset: int | None = None,
-    q: str | None = None,
-) -> tuple[str, list[str | int]]:
-    where, params = _build_where_clause(source, min_score, q)
-    query = "SELECT * FROM leads" + where + " ORDER BY id DESC"
-
-    if limit is not None:
-        query += " LIMIT ?"
-        params.append(limit)
-    if offset is not None:
-        if limit is None:
-            query += " LIMIT -1"
-        query += " OFFSET ?"
-        params.append(offset)
-
-    return query, params
-
-
 @router.get("/leads", response_model=list[LeadResponse])
 def list_leads(
     source: str | None = None,
@@ -236,11 +147,12 @@ def list_leads(
     limit: int | None = Query(default=None, ge=1),
     offset: int | None = Query(default=None, ge=0),
     q: str | None = None,
+    status: str | None = None,
 ) -> list[LeadResponse]:
-    db = get_db()
-    query, params = _build_leads_query(source, min_score, limit, offset, q)
-    rows = db.execute(query, params).fetchall()
-    return [LeadResponse(**dict(row)) for row in rows]
+    try:
+        return query_leads(source, min_score, limit, offset, q, status)
+    except InvalidStatusError as e:
+        raise HTTPException(status_code=422, detail=str(e))
 
 
 @router.get("/leads/summary")
@@ -249,83 +161,7 @@ def get_leads_summary(
     min_score: int | None = Query(default=None, ge=0),
     q: str | None = None,
 ) -> dict:
-    db = get_db()
-    where, params = _build_where_clause(source, min_score, q)
-
-    row = db.execute(
-        f"SELECT COUNT(*) AS total, COALESCE(AVG(score), 0) AS avg_score FROM leads{where}",
-        params,
-    ).fetchone()
-    total_leads = row["total"]
-    average_score = round(row["avg_score"], 1)
-
-    bucket_row = db.execute(
-        f"SELECT"
-        f" SUM(CASE WHEN score < 40 THEN 1 ELSE 0 END) AS low,"
-        f" SUM(CASE WHEN score >= 40 AND score < 60 THEN 1 ELSE 0 END) AS medium,"
-        f" SUM(CASE WHEN score >= 60 THEN 1 ELSE 0 END) AS high"
-        f" FROM leads{where}",
-        params,
-    ).fetchone()
-    low_score_count = bucket_row["low"] or 0
-    medium_score_count = bucket_row["medium"] or 0
-    high_score_count = bucket_row["high"] or 0
-
-    source_rows = db.execute(
-        f"SELECT source, COUNT(*) AS cnt FROM leads{where} GROUP BY source ORDER BY cnt DESC",
-        params,
-    ).fetchall()
-    counts_by_source = {r["source"]: r["cnt"] for r in source_rows}
-
-    return {
-        "total_leads": total_leads,
-        "average_score": average_score,
-        "low_score_count": low_score_count,
-        "medium_score_count": medium_score_count,
-        "high_score_count": high_score_count,
-        "counts_by_source": counts_by_source,
-    }
-
-
-def _get_actionable_leads(
-    source: str | None = None,
-    limit: int | None = None,
-) -> list[LeadOperationalSummary]:
-    """Return actionable leads as LeadOperationalSummary list."""
-    db = get_db()
-    conditions: list[str] = [
-        "(score >= 40 OR (notes IS NOT NULL AND TRIM(notes) != ''))"
-    ]
-    params: list[str | int] = []
-    if source is not None:
-        conditions.append("source = ?")
-        params.append(source)
-    where = " WHERE " + " AND ".join(conditions)
-    query = f"SELECT * FROM leads{where} ORDER BY score DESC"
-    if limit is not None:
-        query += " LIMIT ?"
-        params.append(limit)
-    rows = db.execute(query, params).fetchall()
-    now = datetime.now(timezone.utc).isoformat()
-    results = []
-    for row in rows:
-        lead = dict(row)
-        rating = get_rating(lead["score"])
-        next_action = determine_next_action(lead["score"], lead["notes"])
-        results.append(LeadOperationalSummary(
-            lead_id=lead["id"],
-            name=lead["name"],
-            source=lead["source"],
-            score=lead["score"],
-            rating=rating,
-            next_action=next_action,
-            instruction=get_instruction(next_action),
-            alert=should_alert(lead["score"]),
-            summary=build_summary(lead["name"], lead["source"], lead["score"], rating),
-            created_at=lead["created_at"],
-            generated_at=now,
-        ))
-    return results
+    return get_leads_summary_data(source, min_score, q)
 
 
 @router.get("/leads/actionable", response_model=list[LeadOperationalSummary])
@@ -334,9 +170,6 @@ def get_actionable_leads(
     limit: int | None = Query(default=None, ge=1),
 ) -> list[LeadOperationalSummary]:
     return _get_actionable_leads(source, limit)
-
-
-ACTION_PRIORITY = ["send_to_client", "review_manually", "request_more_info", "enrich_first"]
 
 
 @router.get("/leads/actionable/worklist", response_model=WorklistResponse)
@@ -373,15 +206,12 @@ def export_leads_csv(
     offset: int | None = Query(default=None, ge=0),
     q: str | None = None,
 ) -> PlainTextResponse:
-    db = get_db()
-    query, params = _build_leads_query(source, min_score, limit, offset, q)
-    rows = db.execute(query, params).fetchall()
+    rows = query_leads_for_export(source, min_score, limit, offset, q)
 
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(CSV_COLUMNS)
-    for row in rows:
-        d = dict(row)
+    for d in rows:
         writer.writerow([d[col] for col in CSV_COLUMNS])
 
     return PlainTextResponse(
@@ -393,37 +223,29 @@ def export_leads_csv(
 
 @router.get("/leads/{lead_id}", response_model=LeadResponse)
 def get_lead(lead_id: int) -> LeadResponse:
-    db = get_db()
-    row = db.execute("SELECT * FROM leads WHERE id = ?", (lead_id,)).fetchone()
-    if row is None:
+    lead = get_lead_by_id(lead_id)
+    if lead is None:
         raise HTTPException(status_code=404, detail="Lead not found")
-    return LeadResponse(**dict(row))
+    return lead
+
+
+@router.patch("/leads/{lead_id}/status", response_model=LeadResponse)
+def patch_lead_status(lead_id: int, body: LeadStatusUpdate) -> LeadResponse:
+    try:
+        lead = update_lead_status(lead_id, body.status)
+    except InvalidStatusError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    if lead is None:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    return lead
 
 
 @router.get("/leads/{lead_id}/pack", response_model=LeadPackResponse)
 def get_lead_pack(lead_id: int) -> LeadPackResponse:
-    db = get_db()
-    row = db.execute("SELECT * FROM leads WHERE id = ?", (lead_id,)).fetchone()
-    if row is None:
+    pack = get_lead_pack_by_id(lead_id)
+    if pack is None:
         raise HTTPException(status_code=404, detail="Lead not found")
-    lead = dict(row)
-    rating = get_rating(lead["score"])
-    summary = build_summary(lead["name"], lead["source"], lead["score"], rating)
-    next_action = determine_next_action(lead["score"], lead["notes"])
-    alert = should_alert(lead["score"])
-    return LeadPackResponse(
-        lead_id=lead["id"],
-        created_at=lead["created_at"],
-        name=lead["name"],
-        email=lead["email"],
-        source=lead["source"],
-        notes=lead["notes"],
-        score=lead["score"],
-        rating=rating,
-        summary=summary,
-        next_action=next_action,
-        alert=alert,
-    )
+    return pack
 
 
 @router.get("/leads/{lead_id}/pack/html", response_class=HTMLResponse)
@@ -440,20 +262,10 @@ def get_lead_pack_text(lead_id: int) -> PlainTextResponse:
 
 @router.get("/leads/{lead_id}/operational", response_model=LeadOperationalSummary)
 def get_lead_operational(lead_id: int) -> LeadOperationalSummary:
-    pack = get_lead_pack(lead_id)
-    return LeadOperationalSummary(
-        lead_id=pack.lead_id,
-        name=pack.name,
-        source=pack.source,
-        score=pack.score,
-        rating=pack.rating,
-        next_action=pack.next_action,
-        instruction=get_instruction(pack.next_action),
-        alert=pack.alert,
-        summary=pack.summary,
-        created_at=pack.created_at,
-        generated_at=datetime.now(timezone.utc).isoformat(),
-    )
+    result = get_lead_operational_by_id(lead_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    return result
 
 
 @router.get("/leads/{lead_id}/delivery", response_model=LeadDeliveryResponse)

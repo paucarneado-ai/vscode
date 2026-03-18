@@ -8,6 +8,9 @@ class LeadCreate(BaseModel):
     notes: str | None = None
 
 
+VALID_LEAD_STATUSES = {"new", "contacted", "closed", "not_interested"}
+
+
 class LeadResponse(BaseModel):
     id: int
     name: str
@@ -15,6 +18,7 @@ class LeadResponse(BaseModel):
     source: str
     notes: str | None = None
     score: int
+    status: str = "new"
     created_at: str
 
 
@@ -32,6 +36,7 @@ class LeadPackResponse(BaseModel):
     source: str
     notes: str | None = None
     score: int
+    status: str = "new"
     rating: str
     summary: str
     next_action: str
@@ -56,15 +61,23 @@ class WebIntakePayload(BaseModel):
 class LeadOperationalSummary(BaseModel):
     lead_id: int
     name: str
+    email: str
     source: str
     score: int
+    status: str = "new"
     rating: str
     next_action: str
     instruction: str
+    priority_reason: str
     alert: bool
     summary: str
+    phone: str | None = None
     created_at: str
     generated_at: str
+
+
+class LeadStatusUpdate(BaseModel):
+    status: str = Field(min_length=1)
 
 
 class WorklistGroup(BaseModel):

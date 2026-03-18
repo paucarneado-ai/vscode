@@ -8,7 +8,7 @@ from apps.api.config import settings
 from apps.api.db import init_db
 from apps.api.routes.health import router as health_router
 from apps.api.routes.internal import router as internal_router
-from apps.api.routes.leads import router as leads_router
+from apps.api.routes.leads import router as leads_router, public_router as leads_public_router
 
 # --- Sentry ---
 _sentry_dsn = os.getenv("SENTRY_DSN", "")
@@ -59,5 +59,6 @@ if _otel_enabled:
     FastAPIInstrumentor.instrument_app(app)
 
 app.include_router(health_router)
+app.include_router(leads_public_router)
 app.include_router(internal_router)
 app.include_router(leads_router)

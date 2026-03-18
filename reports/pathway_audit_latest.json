@@ -1,0 +1,595 @@
+{
+  "report_schema_version": 7,
+  "generated_at": "2026-03-18T20:44:01.341186",
+  "summary": {
+    "modules": 17,
+    "functions": 52,
+    "traces": 56,
+    "pathways": 66,
+    "candidates": 7,
+    "immediate": 0,
+    "known_debt": 0,
+    "backlog": 7,
+    "watchlist": 0,
+    "ignored": 0,
+    "prohibited_new": 0,
+    "candidate_types": {
+      "long_path": 5,
+      "redundant_transform": 2
+    }
+  },
+  "graph_health": {
+    "max_fan_out_all": 9,
+    "max_fan_out_runtime": 9,
+    "max_fan_in": 9,
+    "protected_modules": 3
+  },
+  "module_snapshot": [
+    {
+      "module_id": "apps.api.auth",
+      "fan_in": 2,
+      "fan_out": 2,
+      "protected": true,
+      "module_kind": "other"
+    },
+    {
+      "module_id": "apps.api.config",
+      "fan_in": 4,
+      "fan_out": 0,
+      "protected": false,
+      "module_kind": "infra"
+    },
+    {
+      "module_id": "apps.api.db",
+      "fan_in": 3,
+      "fan_out": 0,
+      "protected": true,
+      "module_kind": "infra"
+    },
+    {
+      "module_id": "apps.api.main",
+      "fan_in": 0,
+      "fan_out": 7,
+      "protected": false,
+      "module_kind": "other"
+    },
+    {
+      "module_id": "apps.api.ratelimit",
+      "fan_in": 1,
+      "fan_out": 2,
+      "protected": false,
+      "module_kind": "other"
+    },
+    {
+      "module_id": "apps.api.schemas",
+      "fan_in": 5,
+      "fan_out": 0,
+      "protected": false,
+      "module_kind": "schema"
+    },
+    {
+      "module_id": "apps.api",
+      "fan_in": 9,
+      "fan_out": 0,
+      "protected": false,
+      "module_kind": "other"
+    },
+    {
+      "module_id": "apps.api.routes.health",
+      "fan_in": 1,
+      "fan_out": 2,
+      "protected": false,
+      "module_kind": "route"
+    },
+    {
+      "module_id": "apps.api.routes.internal",
+      "fan_in": 1,
+      "fan_out": 6,
+      "protected": false,
+      "module_kind": "route"
+    },
+    {
+      "module_id": "apps.api.routes.leads",
+      "fan_in": 1,
+      "fan_out": 9,
+      "protected": false,
+      "module_kind": "route"
+    },
+    {
+      "module_id": "apps.api.routes",
+      "fan_in": 1,
+      "fan_out": 0,
+      "protected": false,
+      "module_kind": "route"
+    },
+    {
+      "module_id": "apps.api.services.actions",
+      "fan_in": 3,
+      "fan_out": 0,
+      "protected": false,
+      "module_kind": "service"
+    },
+    {
+      "module_id": "apps.api.services.intake",
+      "fan_in": 1,
+      "fan_out": 5,
+      "protected": false,
+      "module_kind": "service"
+    },
+    {
+      "module_id": "apps.api.services.leadpack",
+      "fan_in": 2,
+      "fan_out": 2,
+      "protected": false,
+      "module_kind": "service"
+    },
+    {
+      "module_id": "apps.api.services.operational",
+      "fan_in": 2,
+      "fan_out": 6,
+      "protected": false,
+      "module_kind": "service"
+    },
+    {
+      "module_id": "apps.api.services.scoring",
+      "fan_in": 1,
+      "fan_out": 0,
+      "protected": true,
+      "module_kind": "service"
+    },
+    {
+      "module_id": "apps.api.services",
+      "fan_in": 4,
+      "fan_out": 0,
+      "protected": false,
+      "module_kind": "service"
+    }
+  ],
+  "module_drift": [
+    {
+      "module_id": "apps.api.auth",
+      "fan_out_old": 2,
+      "fan_out_new": 2,
+      "fan_in_old": 2,
+      "fan_in_new": 2,
+      "classification": "stable"
+    },
+    {
+      "module_id": "apps.api.config",
+      "fan_out_old": 0,
+      "fan_out_new": 0,
+      "fan_in_old": 4,
+      "fan_in_new": 4,
+      "classification": "stable"
+    },
+    {
+      "module_id": "apps.api.db",
+      "fan_out_old": 0,
+      "fan_out_new": 0,
+      "fan_in_old": 3,
+      "fan_in_new": 3,
+      "classification": "stable"
+    },
+    {
+      "module_id": "apps.api.main",
+      "fan_out_old": 7,
+      "fan_out_new": 7,
+      "fan_in_old": 0,
+      "fan_in_new": 0,
+      "classification": "stable"
+    },
+    {
+      "module_id": "apps.api.ratelimit",
+      "fan_out_old": 2,
+      "fan_out_new": 2,
+      "fan_in_old": 1,
+      "fan_in_new": 1,
+      "classification": "stable"
+    },
+    {
+      "module_id": "apps.api.schemas",
+      "fan_out_old": 0,
+      "fan_out_new": 0,
+      "fan_in_old": 5,
+      "fan_in_new": 5,
+      "classification": "stable"
+    },
+    {
+      "module_id": "apps.api",
+      "fan_out_old": 0,
+      "fan_out_new": 0,
+      "fan_in_old": 9,
+      "fan_in_new": 9,
+      "classification": "stable"
+    },
+    {
+      "module_id": "apps.api.routes.health",
+      "fan_out_old": 2,
+      "fan_out_new": 2,
+      "fan_in_old": 1,
+      "fan_in_new": 1,
+      "classification": "stable"
+    },
+    {
+      "module_id": "apps.api.routes.internal",
+      "fan_out_old": 6,
+      "fan_out_new": 6,
+      "fan_in_old": 1,
+      "fan_in_new": 1,
+      "classification": "stable"
+    },
+    {
+      "module_id": "apps.api.routes.leads",
+      "fan_out_old": 9,
+      "fan_out_new": 9,
+      "fan_in_old": 1,
+      "fan_in_new": 1,
+      "classification": "stable"
+    },
+    {
+      "module_id": "apps.api.routes",
+      "fan_out_old": 0,
+      "fan_out_new": 0,
+      "fan_in_old": 1,
+      "fan_in_new": 1,
+      "classification": "stable"
+    },
+    {
+      "module_id": "apps.api.services.actions",
+      "fan_out_old": 0,
+      "fan_out_new": 0,
+      "fan_in_old": 3,
+      "fan_in_new": 3,
+      "classification": "stable"
+    },
+    {
+      "module_id": "apps.api.services.intake",
+      "fan_out_old": 5,
+      "fan_out_new": 5,
+      "fan_in_old": 1,
+      "fan_in_new": 1,
+      "classification": "stable"
+    },
+    {
+      "module_id": "apps.api.services.leadpack",
+      "fan_out_old": 2,
+      "fan_out_new": 2,
+      "fan_in_old": 2,
+      "fan_in_new": 2,
+      "classification": "stable"
+    },
+    {
+      "module_id": "apps.api.services.operational",
+      "fan_out_old": 6,
+      "fan_out_new": 6,
+      "fan_in_old": 2,
+      "fan_in_new": 2,
+      "classification": "stable"
+    },
+    {
+      "module_id": "apps.api.services.scoring",
+      "fan_out_old": 0,
+      "fan_out_new": 0,
+      "fan_in_old": 1,
+      "fan_in_new": 1,
+      "classification": "stable"
+    },
+    {
+      "module_id": "apps.api.services",
+      "fan_out_old": 0,
+      "fan_out_new": 0,
+      "fan_in_old": 4,
+      "fan_in_new": 4,
+      "classification": "stable"
+    }
+  ],
+  "watchlist_state": {},
+  "debt_state": {},
+  "review_queue_state": {
+    "2159fce0cb2559b5": {
+      "operator_status": "resolved",
+      "operator_note": "Accepted MVP debt, review at service-layer extraction",
+      "reviewed_at": "2026-03-18 12:07",
+      "decision_reason": "routes.leads no longer imports db. Write ops extracted to services/intake.py, reads to services/operational.py.",
+      "inactive": true,
+      "last_bucket": "known_debt",
+      "last_description": "Prohibited: apps.api.routes.leads -> apps.api.db (Routes should not access DB directly; use service "
+    },
+    "db9d3be7ac7bffa8": {
+      "operator_status": "resolved",
+      "operator_note": "",
+      "reviewed_at": "2026-03-18 16:55",
+      "decision_reason": "Chain eliminated. DB access moved to services layer.",
+      "inactive": true,
+      "last_bucket": "watchlist",
+      "last_description": "Chain apps.api.routes.internal -> apps.api.routes.leads -> apps.api.db: leads is a shared compositio"
+    },
+    "c85f9b906d552fd0": {
+      "operator_status": "resolved",
+      "operator_note": "",
+      "reviewed_at": "2026-03-18 16:55",
+      "decision_reason": "Chain eliminated. routes.internal no longer imports routes.leads.",
+      "inactive": true,
+      "last_bucket": "watchlist",
+      "last_description": "Chain apps.api.routes.internal -> apps.api.routes.leads -> apps.api.services.scoring: leads is a sha"
+    }
+  },
+  "recommendations": [
+    {
+      "id": "PR-001",
+      "stable_fingerprint": "1350b29a1a1c2386",
+      "type": "redundant_transform",
+      "score": 68.5,
+      "priority": "medium",
+      "review_bucket": "backlog",
+      "governance": "RECOMMENDED_FOR_AUTO_APPROVAL",
+      "action": "extract_shared_function",
+      "modules": [
+        "apps.api.routes.internal",
+        "apps.api.routes.leads",
+        "apps.api.services.operational"
+      ],
+      "confidence": 0.95,
+      "occurrence_count": 3,
+      "watchlist_age": 0,
+      "watchlist_severity_score": 0.0,
+      "escalated_watchlist": false,
+      "debt_status": "",
+      "debt_age": 0,
+      "in_review_queue": false,
+      "operator_status": "",
+      "operator_note": "",
+      "reviewed_at": "",
+      "decision_reason": "",
+      "inactive": false,
+      "why_now": "",
+      "intervention_hint": "",
+      "intermediate_role": "unknown",
+      "role_confidence": 0.0,
+      "role_reason": "",
+      "depends_on_known_debt": false,
+      "evidence": [
+        "apps/api/routes/internal.py:28 get_internal_queue() -> _get_actionable_leads()",
+        "apps/api/routes/leads.py:165 get_actionable_leads() -> _get_actionable_leads()",
+        "apps/api/routes/leads.py:173 get_actionable_worklist() -> _get_actionable_leads()"
+      ]
+    },
+    {
+      "id": "PR-002",
+      "stable_fingerprint": "67ace2770890da71",
+      "type": "redundant_transform",
+      "score": 64.8,
+      "priority": "medium",
+      "review_bucket": "backlog",
+      "governance": "RECOMMENDED_FOR_AUTO_APPROVAL",
+      "action": "extract_shared_function",
+      "modules": [
+        "apps.api.routes.leads",
+        "apps.api.services.intake"
+      ],
+      "confidence": 0.95,
+      "occurrence_count": 5,
+      "watchlist_age": 0,
+      "watchlist_severity_score": 0.0,
+      "escalated_watchlist": false,
+      "debt_status": "",
+      "debt_age": 0,
+      "in_review_queue": false,
+      "operator_status": "",
+      "operator_note": "",
+      "reviewed_at": "",
+      "decision_reason": "",
+      "inactive": false,
+      "why_now": "",
+      "intervention_hint": "",
+      "intermediate_role": "unknown",
+      "role_confidence": 0.0,
+      "role_reason": "",
+      "depends_on_known_debt": false,
+      "evidence": [
+        "apps/api/routes/leads.py:49 create_lead() -> _create_lead_internal()",
+        "apps/api/routes/leads.py:65 ingest_leads() -> _create_lead_internal()",
+        "apps/api/routes/leads.py:84 web_intake() -> _create_lead_internal()",
+        "apps/api/routes/leads.py:99 webhook_ingest() -> _create_lead_internal()",
+        "apps/api/routes/leads.py:124 webhook_ingest_batch() -> _create_lead_internal()"
+      ]
+    },
+    {
+      "id": "PR-003",
+      "stable_fingerprint": "711487cca7ee7a41",
+      "type": "long_path",
+      "score": 57.0,
+      "priority": "medium",
+      "review_bucket": "backlog",
+      "governance": "NEEDS_HUMAN",
+      "action": "evaluate_direct_path",
+      "modules": [
+        "apps.api.routes.internal",
+        "apps.api.services.operational",
+        "apps.api.db"
+      ],
+      "confidence": 0.75,
+      "occurrence_count": 1,
+      "watchlist_age": 0,
+      "watchlist_severity_score": 0.0,
+      "escalated_watchlist": false,
+      "debt_status": "",
+      "debt_age": 0,
+      "in_review_queue": false,
+      "operator_status": "",
+      "operator_note": "",
+      "reviewed_at": "",
+      "decision_reason": "",
+      "inactive": false,
+      "why_now": "",
+      "intervention_hint": "",
+      "intermediate_role": "shared_composer",
+      "role_confidence": 0.7,
+      "role_reason": "calls 4 external modules; invokes 8 distinct functions including composition",
+      "depends_on_known_debt": false,
+      "evidence": [
+        "apps/api/routes/internal.py:28 get_internal_queue->_get_actionable_leads",
+        "apps/api/services/operational.py:42 get_actionable_leads->get_db",
+        "apps/api/services/operational.py:80 get_lead_pack_by_id->get_db"
+      ]
+    },
+    {
+      "id": "PR-004",
+      "stable_fingerprint": "2e93392f9c286626",
+      "type": "long_path",
+      "score": 57.0,
+      "priority": "medium",
+      "review_bucket": "backlog",
+      "governance": "NEEDS_HUMAN",
+      "action": "evaluate_direct_path",
+      "modules": [
+        "apps.api.routes.internal",
+        "apps.api.services.operational",
+        "apps.api.services.leadpack"
+      ],
+      "confidence": 0.75,
+      "occurrence_count": 1,
+      "watchlist_age": 0,
+      "watchlist_severity_score": 0.0,
+      "escalated_watchlist": false,
+      "debt_status": "",
+      "debt_age": 0,
+      "in_review_queue": false,
+      "operator_status": "",
+      "operator_note": "",
+      "reviewed_at": "",
+      "decision_reason": "",
+      "inactive": false,
+      "why_now": "",
+      "intervention_hint": "",
+      "intermediate_role": "shared_composer",
+      "role_confidence": 0.7,
+      "role_reason": "calls 4 external modules; invokes 8 distinct functions including composition",
+      "depends_on_known_debt": false,
+      "evidence": [
+        "apps/api/routes/internal.py:28 get_internal_queue->_get_actionable_leads",
+        "apps/api/services/operational.py:17 build_operational_summary->get_rating",
+        "apps/api/services/operational.py:28 build_operational_summary->build_summary"
+      ]
+    },
+    {
+      "id": "PR-006",
+      "stable_fingerprint": "f67d048caa896fad",
+      "type": "long_path",
+      "score": 57.0,
+      "priority": "medium",
+      "review_bucket": "backlog",
+      "governance": "NEEDS_HUMAN",
+      "action": "evaluate_direct_path",
+      "modules": [
+        "apps.api.routes.leads",
+        "apps.api.services.intake",
+        "apps.api.db"
+      ],
+      "confidence": 0.75,
+      "occurrence_count": 1,
+      "watchlist_age": 0,
+      "watchlist_severity_score": 0.0,
+      "escalated_watchlist": false,
+      "debt_status": "",
+      "debt_age": 0,
+      "in_review_queue": false,
+      "operator_status": "",
+      "operator_note": "",
+      "reviewed_at": "",
+      "decision_reason": "",
+      "inactive": false,
+      "why_now": "",
+      "intervention_hint": "",
+      "intermediate_role": "shared_composer",
+      "role_confidence": 0.7,
+      "role_reason": "calls 3 external modules; invokes 5 distinct functions including composition",
+      "depends_on_known_debt": false,
+      "evidence": [
+        "apps/api/routes/leads.py:49 create_lead->_create_lead_internal",
+        "apps/api/routes/leads.py:65 ingest_leads->_create_lead_internal",
+        "apps/api/services/intake.py:68 create_lead->get_db",
+        "apps/api/services/intake.py:155 query_leads->get_db"
+      ]
+    },
+    {
+      "id": "PR-007",
+      "stable_fingerprint": "7d6a1558ad3c7f7f",
+      "type": "long_path",
+      "score": 57.0,
+      "priority": "medium",
+      "review_bucket": "backlog",
+      "governance": "NEEDS_HUMAN",
+      "action": "evaluate_direct_path",
+      "modules": [
+        "apps.api.routes.leads",
+        "apps.api.services.operational",
+        "apps.api.db"
+      ],
+      "confidence": 0.75,
+      "occurrence_count": 1,
+      "watchlist_age": 0,
+      "watchlist_severity_score": 0.0,
+      "escalated_watchlist": false,
+      "debt_status": "",
+      "debt_age": 0,
+      "in_review_queue": false,
+      "operator_status": "",
+      "operator_note": "",
+      "reviewed_at": "",
+      "decision_reason": "",
+      "inactive": false,
+      "why_now": "",
+      "intervention_hint": "",
+      "intermediate_role": "shared_composer",
+      "role_confidence": 0.7,
+      "role_reason": "calls 4 external modules; invokes 8 distinct functions including composition",
+      "depends_on_known_debt": false,
+      "evidence": [
+        "apps/api/routes/leads.py:165 get_actionable_leads->_get_actionable_leads",
+        "apps/api/routes/leads.py:173 get_actionable_worklist->_get_actionable_leads",
+        "apps/api/services/operational.py:42 get_actionable_leads->get_db",
+        "apps/api/services/operational.py:80 get_lead_pack_by_id->get_db"
+      ]
+    },
+    {
+      "id": "PR-005",
+      "stable_fingerprint": "2b1747c2f334e5c6",
+      "type": "long_path",
+      "score": 53.0,
+      "priority": "medium",
+      "review_bucket": "backlog",
+      "governance": "NEEDS_HUMAN",
+      "action": "evaluate_direct_path",
+      "modules": [
+        "apps.api.routes.leads",
+        "apps.api.services.intake",
+        "apps.api.services.scoring"
+      ],
+      "confidence": 0.75,
+      "occurrence_count": 1,
+      "watchlist_age": 0,
+      "watchlist_severity_score": 0.0,
+      "escalated_watchlist": false,
+      "debt_status": "",
+      "debt_age": 0,
+      "in_review_queue": false,
+      "operator_status": "",
+      "operator_note": "",
+      "reviewed_at": "",
+      "decision_reason": "",
+      "inactive": false,
+      "why_now": "",
+      "intervention_hint": "",
+      "intermediate_role": "shared_composer",
+      "role_confidence": 0.7,
+      "role_reason": "calls 3 external modules; invokes 5 distinct functions including composition",
+      "depends_on_known_debt": false,
+      "evidence": [
+        "apps/api/routes/leads.py:49 create_lead->_create_lead_internal",
+        "apps/api/routes/leads.py:65 ingest_leads->_create_lead_internal",
+        "apps/api/services/intake.py:81 create_lead->calculate_lead_score"
+      ]
+    }
+  ]
+}
