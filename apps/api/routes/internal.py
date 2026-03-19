@@ -82,15 +82,18 @@ from apps.api.schemas import (
 
 router = APIRouter()
 
+_STATUS_RANK = {"new": 0, "contacted": 1, "closed": 2, "not_interested": 2}
 
-def _priority_key(lead: LeadOperationalSummary) -> tuple[int, int, int]:
-    """Sort key: alert DESC, action priority ASC, score DESC."""
+
+def _priority_key(lead: LeadOperationalSummary) -> tuple[int, int, int, int]:
+    """Sort key: alert DESC, status (new first), action priority ASC, score DESC."""
     alert_rank = 0 if lead.alert else 1
+    status_rank = _STATUS_RANK.get(lead.status, 2)
     try:
         action_rank = ACTION_PRIORITY.index(lead.next_action)
     except ValueError:
         action_rank = len(ACTION_PRIORITY)
-    return (alert_rank, action_rank, -lead.score)
+    return (alert_rank, status_rank, action_rank, -lead.score)
 
 
 @router.get("/internal/queue", response_model=QueueResponse)

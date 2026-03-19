@@ -6,12 +6,14 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 
 from apps.api.db import get_db
 from collections import defaultdict
 
+from apps.api.auth import require_api_key
+from apps.api.ratelimit import require_rate_limit
 from apps.api.schemas import (
     ExternalLeadPayload,
     ExternalLeadResult,
@@ -19,10 +21,13 @@ from apps.api.schemas import (
     LeadCreateResult,
     LeadDeliveryResponse,
     LeadsSummaryResponse,
+    LeadStatusUpdate,
     LeadOperationalSummary,
     LeadPackResponse,
     LeadResponse,
+    VALID_LEAD_STATUSES,
     WebhookLeadPayload,
+    WebIntakePayload,
     WorklistGroup,
     WorklistResponse,
 )
@@ -37,7 +42,8 @@ from apps.api.services.scoring import calculate_lead_score
 from apps.api.events import emit_event
 
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_api_key)])
+public_router = APIRouter(dependencies=[Depends(require_rate_limit)])
 
 _CANONICAL_SOURCE_RE = re.compile(r"^[a-z0-9]+:[a-z0-9][a-z0-9_-]*$")
 _PROVIDER_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
@@ -195,6 +201,28 @@ def webhook_ingest_batch(provider: str, items: list[WebhookLeadPayload]) -> dict
     }
 
 
+@public_router.post("/leads/intake/web")
+def web_intake(payload: WebIntakePayload) -> dict:
+    """Public web form intake (rate-limited, no API key)."""
+    source = (payload.origen or "web:sentyacht").strip().lower() or "web:sentyacht"
+    notes_lines = []
+    if payload.telefono:
+        notes_lines.append(f"Teléfono: {payload.telefono}")
+    if payload.interes:
+        notes_lines.append(f"Interés: {payload.interes}")
+    if payload.mensaje:
+        notes_lines.append(f"Mensaje: {payload.mensaje}")
+    notes = "\n".join(notes_lines) if notes_lines else None
+    lead_create = LeadCreate(name=payload.nombre, email=payload.email, source=source, notes=notes)
+    result, status = _create_lead_internal(lead_create)
+    if status == 409:
+        return JSONResponse(
+            status_code=409,
+            content={"status": "duplicate", "lead_id": result.lead.id},
+        )
+    return {"status": "accepted", "lead_id": result.lead.id}
+
+
 def _build_external_notes(
     notes: str | None,
     phone: str | None,
@@ -321,11 +349,23 @@ def list_leads(
     limit: int | None = Query(default=None, ge=1),
     offset: int | None = Query(default=None, ge=0),
     q: str | None = None,
+    status: str | None = None,
     created_from: str | None = None,
     created_to: str | None = None,
 ) -> list[LeadResponse]:
+    if status and status not in VALID_LEAD_STATUSES:
+        raise HTTPException(status_code=422, detail=f"Invalid status: {status}")
     db = get_db()
     query, params = _build_leads_query(source, min_score, limit, offset, q, created_from, created_to)
+    # Inject status filter before ORDER BY
+    if status:
+        keyword = "AND" if "WHERE" in query else "WHERE"
+        order_idx = query.find("ORDER BY")
+        if order_idx > 0:
+            query = query[:order_idx] + f"{keyword} status = ? " + query[order_idx:]
+        else:
+            query += f" {keyword} status = ?"
+        params.append(status)
     rows = db.execute(query, params).fetchall()
     return [LeadResponse(**dict(row)) for row in rows]
 
@@ -500,6 +540,20 @@ def get_lead(lead_id: int) -> LeadResponse:
     row = db.execute("SELECT * FROM leads WHERE id = ?", (lead_id,)).fetchone()
     if row is None:
         raise HTTPException(status_code=404, detail="Lead not found")
+    return LeadResponse(**dict(row))
+
+
+@router.patch("/leads/{lead_id}/status", response_model=LeadResponse)
+def patch_lead_status(lead_id: int, body: LeadStatusUpdate) -> LeadResponse:
+    if body.status not in VALID_LEAD_STATUSES:
+        raise HTTPException(status_code=422, detail=f"Invalid status: {body.status}")
+    db = get_db()
+    row = db.execute("SELECT * FROM leads WHERE id = ?", (lead_id,)).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    db.execute("UPDATE leads SET status = ? WHERE id = ?", (body.status, lead_id))
+    db.commit()
+    row = db.execute("SELECT * FROM leads WHERE id = ?", (lead_id,)).fetchone()
     return LeadResponse(**dict(row))
 
 

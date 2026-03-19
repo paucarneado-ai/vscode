@@ -3,6 +3,9 @@ from typing import Any, Literal
 from pydantic import BaseModel, EmailStr, Field
 
 
+VALID_LEAD_STATUSES = {"new", "contacted", "closed", "not_interested"}
+
+
 class LeadCreate(BaseModel):
     name: str = Field(min_length=1)
     email: EmailStr
@@ -17,7 +20,21 @@ class LeadResponse(BaseModel):
     source: str
     notes: str | None = None
     score: int
+    status: str = "new"
     created_at: str
+
+
+class LeadStatusUpdate(BaseModel):
+    status: str = Field(min_length=1)
+
+
+class WebIntakePayload(BaseModel):
+    nombre: str = Field(min_length=1)
+    email: EmailStr
+    telefono: str | None = None
+    interes: str | None = None
+    mensaje: str | None = None
+    origen: str | None = None
 
 
 class LeadsSummaryResponse(BaseModel):
@@ -614,23 +631,3 @@ class FollowupQueueResponse(BaseModel):
     generated_at: str
     total: int
     items: list[FollowupItem]
-
-# --- TEMPORARY: rescue/openclaw-import-phase1 ---
-# These definitions are required by apps/api/services/intake.py (imported in phase 1).
-# They must be properly merged into this file during phase 2.
-# Do not add more definitions here — resolve in phase 2 merge instead.
-
-VALID_LEAD_STATUSES = {"new", "contacted", "closed", "not_interested"}
-
-
-class LeadStatusUpdate(BaseModel):
-    status: str = Field(min_length=1)
-
-
-class WebIntakePayload(BaseModel):
-    nombre: str = Field(min_length=1)
-    email: EmailStr
-    telefono: str | None = None
-    interes: str | None = None
-    mensaje: str | None = None
-    origen: str | None = None

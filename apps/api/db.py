@@ -25,6 +25,7 @@ def init_db() -> None:
             source TEXT NOT NULL,
             notes TEXT,
             score INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'new',
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         )
         """
@@ -68,6 +69,11 @@ def init_db() -> None:
         )
         """
     )
+    # Add status column to existing databases that don't have it
+    try:
+        db.execute("SELECT status FROM leads LIMIT 1")
+    except Exception:
+        db.execute("ALTER TABLE leads ADD COLUMN status TEXT NOT NULL DEFAULT 'new'")
     db.commit()
 
 
