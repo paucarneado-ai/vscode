@@ -1,0 +1,53 @@
+{
+  "slug": "navalia-60-2006",
+  "name": "Navalia 60",
+  "brand": "Navalia",
+  "type": "motor",
+  "year": 2006,
+  "price": 360000,
+  "length": 18.0,
+  "beam": 5.2,
+  "draft": 1.5,
+  "location": "Barcelona",
+  "condition": "used",
+  "badges": [],
+  "engines": "2× Caterpillar 800 CV",
+  "fuel": "Diésel",
+  "cabins": 3,
+  "berths": 6,
+  "heads": 2,
+  "description": {
+    "es": "Navalia 60 de fabricación española con diseño mediterráneo. Tres cabinas, amplio salón con buena visibilidad y plataforma de baño generosa. Mantenimiento profesional desde su botadura.",
+    "en": "Spanish-built Navalia 60 with Mediterranean design. Three cabins, spacious saloon with good visibility and generous bathing platform. Professionally maintained since launch."
+  },
+  "specs": {
+    "es": {
+      "Eslora": "18,00 m",
+      "Manga": "5,20 m",
+      "Calado": "1,50 m",
+      "Motor": "2× Caterpillar 800 CV",
+      "Combustible": "Diésel",
+      "Cabinas": "3",
+      "Literas": "6",
+      "Baños": "2",
+      "Año": "2006",
+      "Puerto": "Barcelona"
+    },
+    "en": {
+      "Length": "18.00 m",
+      "Beam": "5.20 m",
+      "Draft": "1.50 m",
+      "Engine": "2× Caterpillar 800 HP",
+      "Fuel": "Diesel",
+      "Cabins": "3",
+      "Berths": "6",
+      "Heads": "2",
+      "Year": "2006",
+      "Port": "Barcelona"
+    }
+  },
+  "images": [
+    "navalia-60-1.jpg"
+  ],
+  "visible": true
+}

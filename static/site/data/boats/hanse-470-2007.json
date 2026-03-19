@@ -1,0 +1,53 @@
+{
+  "slug": "hanse-470-2007",
+  "name": "Hanse 470",
+  "brand": "Hanse",
+  "type": "sail",
+  "year": 2007,
+  "price": 210000,
+  "length": 14.19,
+  "beam": 4.36,
+  "draft": 2.1,
+  "location": "Barcelona",
+  "condition": "used",
+  "badges": [],
+  "engines": "1× Yanmar 55 CV",
+  "fuel": "Diésel",
+  "cabins": 3,
+  "berths": 6,
+  "heads": 2,
+  "description": {
+    "es": "Hanse 470, velero de crucero de alto rendimiento del astillero alemán. Tres cabinas, dos baños, cockpit amplio. Jarcia y velas en buen estado. Ideal para regatas y cruceros largos.",
+    "en": "Hanse 470, high-performance cruising sailboat from the German shipyard. Three cabins, two heads, spacious cockpit. Rigging and sails in good condition. Ideal for racing and extended cruising."
+  },
+  "specs": {
+    "es": {
+      "Eslora": "14,19 m",
+      "Manga": "4,36 m",
+      "Calado": "2,10 m",
+      "Motor": "1× Yanmar 55 CV",
+      "Combustible": "Diésel",
+      "Cabinas": "3",
+      "Literas": "6",
+      "Baños": "2",
+      "Año": "2007",
+      "Puerto": "Barcelona"
+    },
+    "en": {
+      "Length": "14.19 m",
+      "Beam": "4.36 m",
+      "Draft": "2.10 m",
+      "Engine": "1× Yanmar 55 HP",
+      "Fuel": "Diesel",
+      "Cabins": "3",
+      "Berths": "6",
+      "Heads": "2",
+      "Year": "2007",
+      "Port": "Barcelona"
+    }
+  },
+  "images": [
+    "hanse-470-1.jpg"
+  ],
+  "visible": true
+}

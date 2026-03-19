@@ -1,0 +1,56 @@
+{
+  "slug": "rodman-900-flybridge-1996",
+  "name": "Rodman 900 FLY",
+  "brand": "Rodman",
+  "type": "motor",
+  "year": 1996,
+  "price": 39000,
+  "length": 9.0,
+  "beam": 3.1,
+  "draft": 0.9,
+  "location": "El Masnou",
+  "condition": "used",
+  "badges": [
+    "stock",
+    "price-drop"
+  ],
+  "engines": "2× Volvo 150 CV",
+  "fuel": "Diésel",
+  "cabins": 1,
+  "berths": 4,
+  "heads": 1,
+  "description": {
+    "es": "Rodman 900 Flybridge, embarcación española fiable y marinera. Una cabina, un baño, flybridge con buena visibilidad. Opción accesible para iniciarse en la náutica.",
+    "en": "Rodman 900 Flybridge, a reliable and seaworthy Spanish boat. One cabin, one head, flybridge with good visibility. An accessible option for newcomers to boating."
+  },
+  "specs": {
+    "es": {
+      "Eslora": "9,00 m",
+      "Manga": "3,10 m",
+      "Calado": "0,90 m",
+      "Motor": "2× Volvo 150 CV",
+      "Combustible": "Diésel",
+      "Cabinas": "1",
+      "Literas": "4",
+      "Baños": "1",
+      "Año": "1996",
+      "Puerto": "El Masnou"
+    },
+    "en": {
+      "Length": "9.00 m",
+      "Beam": "3.10 m",
+      "Draft": "0.90 m",
+      "Engine": "2× Volvo 150 HP",
+      "Fuel": "Diesel",
+      "Cabins": "1",
+      "Berths": "4",
+      "Heads": "1",
+      "Year": "1996",
+      "Port": "El Masnou"
+    }
+  },
+  "images": [
+    "rodman-900-1.jpg"
+  ],
+  "visible": true
+}

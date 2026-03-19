@@ -41,3 +41,6 @@ coverage/
 .claude/settings.local.json
 
 openclaw.db
+
+# Image backups
+_backup/

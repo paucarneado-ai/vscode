@@ -1,0 +1,53 @@
+{
+  "slug": "astondoa-53-glx-1993",
+  "name": "Astondoa 53 GLX",
+  "brand": "Astondoa",
+  "type": "motor",
+  "year": 1993,
+  "price": 195000,
+  "length": 15.85,
+  "beam": 4.6,
+  "draft": 1.3,
+  "location": "Barcelona",
+  "condition": "used",
+  "badges": [],
+  "engines": "2× MAN 570 CV",
+  "fuel": "Diésel",
+  "cabins": 3,
+  "berths": 6,
+  "heads": 2,
+  "description": {
+    "es": "Clásico Astondoa 53 GLX con líneas atemporales. Tres cabinas, dos baños, salón luminoso. Un referente de la construcción naval española. Mantenimiento impecable para su antigüedad.",
+    "en": "Classic Astondoa 53 GLX with timeless lines. Three cabins, two heads, bright saloon. A benchmark of Spanish shipbuilding. Impeccably maintained for her age."
+  },
+  "specs": {
+    "es": {
+      "Eslora": "15,85 m",
+      "Manga": "4,60 m",
+      "Calado": "1,30 m",
+      "Motor": "2× MAN 570 CV",
+      "Combustible": "Diésel",
+      "Cabinas": "3",
+      "Literas": "6",
+      "Baños": "2",
+      "Año": "1993",
+      "Puerto": "Barcelona"
+    },
+    "en": {
+      "Length": "15.85 m",
+      "Beam": "4.60 m",
+      "Draft": "1.30 m",
+      "Engine": "2× MAN 570 HP",
+      "Fuel": "Diesel",
+      "Cabins": "3",
+      "Berths": "6",
+      "Heads": "2",
+      "Year": "1993",
+      "Port": "Barcelona"
+    }
+  },
+  "images": [
+    "astondoa-53-glx-1.jpg"
+  ],
+  "visible": true
+}

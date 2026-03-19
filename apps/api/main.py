@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from apps.api.config import settings
 from apps.api.db import init_db
+from apps.api.routes.admin import router as admin_router, public_router as admin_public_router
 from apps.api.routes.health import router as health_router
 from apps.api.routes.internal import router as internal_router
 from apps.api.routes.leads import router as leads_router, public_router as leads_public_router
@@ -59,6 +60,8 @@ if _otel_enabled:
     FastAPIInstrumentor.instrument_app(app)
 
 app.include_router(health_router)
+app.include_router(admin_public_router)
 app.include_router(leads_public_router)
 app.include_router(internal_router)
+app.include_router(admin_router)
 app.include_router(leads_router)

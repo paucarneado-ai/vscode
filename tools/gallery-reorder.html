@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SentYacht — Gallery Reorder Tool</title>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0B1220; color: #F2EDE8; padding: 24px; }
+    h1 { font-size: 1.3rem; margin-bottom: 8px; font-weight: 600; }
+    .subtitle { color: #8A9BB5; font-size: 0.85rem; margin-bottom: 24px; }
+    .controls { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+    select, button, input[type=file] { padding: 8px 14px; border-radius: 4px; border: 1px solid #1E3148; background: #142233; color: #F2EDE8; font-size: 0.85rem; cursor: pointer; }
+    button { background: #C9A96E; color: #0a1e30; font-weight: 600; border: none; }
+    button:hover { background: #e0c06a; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.secondary { background: #1E3148; color: #F2EDE8; }
+    .status { color: #8A9BB5; font-size: 0.8rem; margin-top: 8px; min-height: 20px; }
+    .status.success { color: #4ade80; }
+    .status.error { color: #f87171; }
+    .status.warning { color: #fbbf24; }
+    .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-top: 16px; }
+    .gallery-item { position: relative; aspect-ratio: 4/3; overflow: hidden; border-radius: 4px; cursor: grab; border: 2px solid transparent; transition: border-color 0.2s, opacity 0.2s, transform 0.2s; }
+    .gallery-item:active { cursor: grabbing; }
+    .gallery-item img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+    .gallery-item .label { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.7); color: #fff; font-size: 0.7rem; padding: 3px 6px; text-align: center; }
+    .gallery-item.hero-marker { border-color: #C9A96E; }
+    .gallery-item.hero-marker .label { background: #C9A96E; color: #0a1e30; font-weight: 600; }
+    .gallery-item .img-error { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; background: #1E3148; color: #8A9BB5; font-size: 0.7rem; text-align: center; padding: 8px; }
+    .sortable-ghost { opacity: 0.3; }
+    .sortable-chosen { border-color: #C9A96E; transform: scale(1.03); box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+    .instructions { background: #142233; border: 1px solid #1E3148; border-radius: 6px; padding: 16px; margin-bottom: 24px; font-size: 0.82rem; line-height: 1.6; color: #8A9BB5; }
+    .instructions strong { color: #F2EDE8; }
+    .unsaved-badge { display: none; background: #fbbf24; color: #0a1e30; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 10px; margin-left: 8px; vertical-align: middle; }
+    .unsaved-badge.visible { display: inline-block; }
+    .img-count { color: #8A9BB5; font-size: 0.8rem; margin-top: 4px; }
+  </style>
+</head>
+<body>
+
+  <h1>Gallery Reorder Tool <span class="unsaved-badge" id="unsaved-badge">cambios sin guardar</span></h1>
+  <p class="subtitle">Arrastra las imágenes para cambiar el orden. La primera imagen será la hero de la ficha.</p>
+
+  <div class="instructions">
+    <strong>Cómo usar:</strong><br>
+    1. Abre esta página localmente (doble clic en el archivo).<br>
+    2. Selecciona el manifest.json del barco que quieres reordenar.<br>
+    3. Arrastra las imágenes al orden deseado.<br>
+    4. Haz clic en "Guardar orden" para descargar el manifest actualizado.<br>
+    5. Reemplaza el manifest.json original con el descargado.<br>
+    6. Ejecuta: <code>python scripts/integrate_galleries.py</code> para regenerar las galerías HTML.<br>
+    7. Despliega con: <code>bash deploy/deploy-staging.sh</code>
+  </div>
+
+  <div class="controls">
+    <input type="file" id="file-input" accept=".json">
+    <button id="save-btn" disabled>Guardar orden</button>
+    <button id="reset-btn" class="secondary" disabled>Resetear orden original</button>
+  </div>
+  <p class="status" id="status"></p>
+  <p class="img-count" id="img-count"></p>
+
+  <div class="gallery" id="gallery"></div>
+
+  <script>
+    var manifestData = null;
+    var originalFiles = null;
+    var boatSlug = '';
+    var hasUnsavedChanges = false;
+
+    var fileInput = document.getElementById('file-input');
+    var saveBtn = document.getElementById('save-btn');
+    var resetBtn = document.getElementById('reset-btn');
+    var statusEl = document.getElementById('status');
+    var galleryEl = document.getElementById('gallery');
+    var unsavedBadge = document.getElementById('unsaved-badge');
+    var imgCountEl = document.getElementById('img-count');
+
+    function setStatus(msg, type) {
+      statusEl.textContent = msg;
+      statusEl.className = 'status' + (type ? ' ' + type : '');
+    }
+
+    function setUnsaved(changed) {
+      hasUnsavedChanges = changed;
+      unsavedBadge.className = 'unsaved-badge' + (changed ? ' visible' : '');
+    }
+
+    function arraysEqual(a, b) {
+      if (a.length !== b.length) return false;
+      for (var i = 0; i < a.length; i++) { if (a[i] !== b[i]) return false; }
+      return true;
+    }
+
+    // Warn on close with unsaved changes
+    window.addEventListener('beforeunload', function(e) {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
+
+    fileInput.addEventListener('change', function(e) {
+      var file = e.target.files[0];
+      if (!file) return;
+
+      // Validate file name
+      if (file.name !== 'manifest.json') {
+        setStatus('Advertencia: el archivo se llama "' + file.name + '", se esperaba "manifest.json".', 'warning');
+      }
+
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        try {
+          manifestData = JSON.parse(ev.target.result);
+        } catch(err) {
+          setStatus('Error: JSON inválido — ' + err.message, 'error');
+          return;
+        }
+
+        // Validate required structure
+        if (!manifestData || typeof manifestData !== 'object') {
+          setStatus('Error: el archivo no contiene un objeto JSON válido.', 'error');
+          manifestData = null;
+          return;
+        }
+
+        if (!manifestData.files || !Array.isArray(manifestData.files) || manifestData.files.length === 0) {
+          setStatus('Error: manifest no tiene array "files" o está vacío.', 'error');
+          manifestData = null;
+          return;
+        }
+
+        // Validate filenames
+        var safePattern = /^[a-zA-Z0-9_\-]+\.jpg$/;
+        var badFiles = manifestData.files.filter(function(f) { return !safePattern.test(f); });
+        if (badFiles.length > 0) {
+          setStatus('Error: nombres de archivo no válidos: ' + badFiles.join(', '), 'error');
+          manifestData = null;
+          return;
+        }
+
+        // Check for duplicates
+        var seen = {};
+        var dupes = [];
+        manifestData.files.forEach(function(f) {
+          if (seen[f]) dupes.push(f);
+          seen[f] = true;
+        });
+        if (dupes.length > 0) {
+          setStatus('Error: archivos duplicados en manifest: ' + dupes.join(', '), 'error');
+          manifestData = null;
+          return;
+        }
+
+        boatSlug = manifestData.slug || 'unknown';
+        originalFiles = manifestData.files.slice();
+
+        renderGallery();
+        saveBtn.disabled = false;
+        resetBtn.disabled = false;
+        setUnsaved(false);
+        setStatus(boatSlug + ': ' + manifestData.files.length + ' imágenes cargadas');
+        imgCountEl.textContent = manifestData.files.length + ' imágenes en galería';
+      };
+      reader.readAsText(file);
+    });
+
+    function renderGallery() {
+      galleryEl.innerHTML = '';
+      var loadErrors = 0;
+      manifestData.files.forEach(function(filename, idx) {
+        var item = document.createElement('div');
+        item.className = 'gallery-item' + (idx === 0 ? ' hero-marker' : '');
+        item.setAttribute('data-file', filename);
+
+        var img = document.createElement('img');
+        img.alt = filename;
+
+        // Try multiple relative paths for local preview
+        var paths = [
+          '../static/site/assets/boats/' + boatSlug + '/' + filename,
+          '../../static/site/assets/boats/' + boatSlug + '/' + filename,
+          '/assets/boats/' + boatSlug + '/' + filename
+        ];
+        var pathIdx = 0;
+        img.src = paths[0];
+        img.onerror = function() {
+          pathIdx++;
+          if (pathIdx < paths.length) {
+            this.src = paths[pathIdx];
+          } else {
+            // All paths failed — show filename placeholder
+            loadErrors++;
+            var placeholder = document.createElement('div');
+            placeholder.className = 'img-error';
+            placeholder.textContent = filename + '\n(preview no disponible)';
+            this.parentNode.replaceChild(placeholder, this);
+            if (loadErrors === manifestData.files.length) {
+              setStatus('Las previsualizaciones no se pudieron cargar. El reorden sigue funcionando normalmente. Para ver previews, abre este archivo desde la raíz del proyecto o sirve con un servidor local.', 'warning');
+            }
+          }
+        };
+
+        var label = document.createElement('div');
+        label.className = 'label';
+        label.textContent = idx === 0 ? 'HERO — ' + filename : filename;
+
+        item.appendChild(img);
+        item.appendChild(label);
+        galleryEl.appendChild(item);
+      });
+
+      // Initialize SortableJS
+      if (window._sortable) window._sortable.destroy();
+      window._sortable = Sortable.create(galleryEl, {
+        animation: 200,
+        ghostClass: 'sortable-ghost',
+        chosenClass: 'sortable-chosen',
+        onEnd: function() {
+          // Update manifest files array from DOM order
+          var items = galleryEl.querySelectorAll('.gallery-item');
+          manifestData.files = Array.from(items).map(function(item) {
+            return item.getAttribute('data-file');
+          });
+          // Update hero markers and labels
+          items.forEach(function(item, idx) {
+            var label = item.querySelector('.label');
+            var file = item.getAttribute('data-file');
+            if (idx === 0) {
+              item.classList.add('hero-marker');
+              if (label) label.textContent = 'HERO — ' + file;
+            } else {
+              item.classList.remove('hero-marker');
+              if (label) label.textContent = file;
+            }
+          });
+          // Track unsaved state
+          var changed = !arraysEqual(manifestData.files, originalFiles);
+          setUnsaved(changed);
+          if (changed) {
+            setStatus('Orden modificado. Haz clic en "Guardar orden" para descargar.');
+          } else {
+            setStatus('Orden vuelto al original.');
+          }
+        }
+      });
+    }
+
+    saveBtn.addEventListener('click', function() {
+      if (!manifestData) return;
+      var json = JSON.stringify(manifestData, null, 2) + '\n';
+      var blob = new Blob([json], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'manifest.' + boatSlug + '.updated.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      setUnsaved(false);
+      setStatus('manifest.json descargado. Reemplaza el original en assets/boats/' + boatSlug + '/ y ejecuta integrate_galleries.py', 'success');
+    });
+
+    resetBtn.addEventListener('click', function() {
+      if (!originalFiles) return;
+      manifestData.files = originalFiles.slice();
+      renderGallery();
+      setUnsaved(false);
+      setStatus('Orden reseteado al original.');
+    });
+  </script>
+</body>
+</html>

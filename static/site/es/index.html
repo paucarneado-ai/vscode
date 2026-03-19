@@ -414,7 +414,7 @@
     document.addEventListener('DOMContentLoaded', () => {
       const grid = document.getElementById('boat-grid');
       if (!grid) return;
-      const featured = sortBoats(boats, 'price', 'desc').slice(0, 6);
+      const featured = sortBoats(getPublishedBoats(), 'price', 'desc').slice(0, 6);
       featured.forEach((boat, i) => {
         const badgeHTML = boat.badges.map(b => {
           const labels = { stock: 'En stock', new: 'Novedad', 'price-drop': 'Precio rebajado' };

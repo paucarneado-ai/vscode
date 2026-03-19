@@ -1,0 +1,55 @@
+{
+  "slug": "ketch-nordic-36-classic-1981",
+  "name": "Ketch Nordic 36 Classic",
+  "brand": "Ketch",
+  "type": "sail",
+  "year": 1981,
+  "price": 39500,
+  "length": 10.97,
+  "beam": 3.2,
+  "draft": 1.65,
+  "location": "El Masnou",
+  "condition": "used",
+  "badges": [
+    "new"
+  ],
+  "engines": "1× Volvo 28 CV",
+  "fuel": "Diésel",
+  "cabins": 2,
+  "berths": 5,
+  "heads": 1,
+  "description": {
+    "es": "Ketch Nordic 36 Classic, velero clásico con aparejo de ketch ideal para navegación oceánica. Dos cabinas, un baño. Construcción nórdica robusta. Disponible en El Masnou.",
+    "en": "Ketch Nordic 36 Classic, a classic ketch-rigged sailboat ideal for ocean sailing. Two cabins, one head. Robust Nordic construction. Available in El Masnou."
+  },
+  "specs": {
+    "es": {
+      "Eslora": "10,97 m",
+      "Manga": "3,20 m",
+      "Calado": "1,65 m",
+      "Motor": "1× Volvo 28 CV",
+      "Combustible": "Diésel",
+      "Cabinas": "2",
+      "Literas": "5",
+      "Baños": "1",
+      "Año": "1981",
+      "Puerto": "El Masnou"
+    },
+    "en": {
+      "Length": "10.97 m",
+      "Beam": "3.20 m",
+      "Draft": "1.65 m",
+      "Engine": "1× Volvo 28 HP",
+      "Fuel": "Diesel",
+      "Cabins": "2",
+      "Berths": "5",
+      "Heads": "1",
+      "Year": "1981",
+      "Port": "El Masnou"
+    }
+  },
+  "images": [
+    "ketch-nordic-36-1.jpg"
+  ],
+  "visible": true
+}
