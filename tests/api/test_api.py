@@ -26,6 +26,11 @@ VALID_LEAD = {
     "notes": "interested in demo",
 }
 
+# Strong notes that produce score >= 60 for ANY source (including non-test)
+# base(20) + notes(5) + boat_type(10) + phone(10) + eslora(10) + detail(5) = 60
+# With test source: +5 more = 65
+STRONG_NOTES = "Tipo: Velero\nTeléfono: +34612345678\nEslora: 14m\nMarca/modelo: Hanse 470"
+
 
 def test_health():
     response = client.get("/health")
@@ -1792,7 +1797,7 @@ def test_dispatch_source_filter():
     """Source filter works on dispatch endpoint."""
     client.post("/leads", json={
         "name": "Dispatch Src", "email": "dsrc@dispatch.com",
-        "source": "dispatch_src", "notes": "real notes",
+        "source": "dispatch_src", "notes": STRONG_NOTES,
     })
     resp = client.get("/internal/dispatch", params={"source": "dispatch_src"})
     assert resp.status_code == 200
@@ -1905,7 +1910,7 @@ def test_claim_success():
     """Claim existing leads returns them in claimed list."""
     r = client.post("/leads", json={
         "name": "Claim OK", "email": "claimok@claim.com",
-        "source": "claimtest", "notes": "real notes",
+        "source": "claimtest", "notes": STRONG_NOTES,
     })
     lead_id = r.json()["lead"]["id"]
     resp = client.post("/internal/dispatch/claim", json={"lead_ids": [lead_id]})
@@ -1920,7 +1925,7 @@ def test_claim_duplicate_in_already_claimed():
     """Claiming an already-claimed lead returns it in already_claimed."""
     r = client.post("/leads", json={
         "name": "Claim Dup", "email": "claimdup@claim.com",
-        "source": "claimtest", "notes": "real notes",
+        "source": "claimtest", "notes": STRONG_NOTES,
     })
     lead_id = r.json()["lead"]["id"]
     client.post("/internal/dispatch/claim", json={"lead_ids": [lead_id]})
@@ -1946,14 +1951,14 @@ def test_claim_mixed_results():
     """Mixed claim: one new, one duplicate, one not_found."""
     r = client.post("/leads", json={
         "name": "Claim Mix A", "email": "claimmix_a@claim.com",
-        "source": "claimtest", "notes": "real notes",
+        "source": "claimtest", "notes": STRONG_NOTES,
     })
     id_a = r.json()["lead"]["id"]
     client.post("/internal/dispatch/claim", json={"lead_ids": [id_a]})
 
     r2 = client.post("/leads", json={
         "name": "Claim Mix B", "email": "claimmix_b@claim.com",
-        "source": "claimtest", "notes": "real notes",
+        "source": "claimtest", "notes": STRONG_NOTES,
     })
     id_b = r2.json()["lead"]["id"]
 
@@ -1970,7 +1975,7 @@ def test_dispatch_excludes_claimed():
     """Claimed leads do not appear in GET /internal/dispatch."""
     r = client.post("/leads", json={
         "name": "Dispatch Excl", "email": "dispexcl@claim.com",
-        "source": "claimexcl", "notes": "real notes",
+        "source": "claimexcl", "notes": STRONG_NOTES,
     })
     lead_id = r.json()["lead"]["id"]
     # Should appear before claim
@@ -1989,7 +1994,7 @@ def test_dispatch_unclaimed_unaffected():
     """Unclaimed leads still appear normally in dispatch."""
     r = client.post("/leads", json={
         "name": "Unclaimed", "email": "unclaimed@claim.com",
-        "source": "claimuncl", "notes": "real notes",
+        "source": "claimuncl", "notes": STRONG_NOTES,
     })
     lead_id = r.json()["lead"]["id"]
     resp = client.get("/internal/dispatch", params={"source": "claimuncl"})
@@ -2007,7 +2012,7 @@ def test_claim_duplicate_ids_deduplicated():
     """Duplicate lead_ids in same request are deduplicated — ID appears only once in response."""
     r = client.post("/leads", json={
         "name": "Claim Dedup", "email": "claimdedup@claim.com",
-        "source": "claimtest", "notes": "real notes",
+        "source": "claimtest", "notes": STRONG_NOTES,
     })
     lead_id = r.json()["lead"]["id"]
     resp = client.post("/internal/dispatch/claim", json={"lead_ids": [lead_id, lead_id, lead_id]})
@@ -2037,7 +2042,7 @@ def test_handoff_item_contract():
     """Each handoff item has exactly the approved fields."""
     r = client.post("/leads", json={
         "name": "Handoff Contract", "email": "hcontract@handoff.com",
-        "source": "handofftest", "notes": "real notes for handoff",
+        "source": "handofftest", "notes": STRONG_NOTES,
     })
     assert r.status_code == 200
     resp = client.get("/internal/handoffs", params={"source": "handofftest"})
@@ -2056,7 +2061,7 @@ def test_handoffs_excludes_claimed():
     """Claimed leads do not appear in handoffs."""
     r = client.post("/leads", json={
         "name": "Handoff Excl", "email": "hexcl@handoff.com",
-        "source": "handoffexcl", "notes": "real notes",
+        "source": "handoffexcl", "notes": STRONG_NOTES,
     })
     lead_id = r.json()["lead"]["id"]
     resp_before = client.get("/internal/handoffs", params={"source": "handoffexcl"})
@@ -2072,7 +2077,7 @@ def test_handoffs_action_filter():
     """Action filter works on handoffs."""
     r = client.post("/leads", json={
         "name": "Handoff Act", "email": "hact@handoff.com",
-        "source": "handoffact", "notes": "real notes",
+        "source": "handoffact", "notes": STRONG_NOTES,
     })
     assert r.status_code == 200
     lead = r.json()["lead"]
@@ -2105,7 +2110,7 @@ def test_handoffs_instruction_contains_lead_info():
     """Instruction includes lead name, source, and score."""
     r = client.post("/leads", json={
         "name": "Handoff Info", "email": "hinfo@handoff.com",
-        "source": "handoffinfo", "notes": "real notes",
+        "source": "handoffinfo", "notes": STRONG_NOTES,
     })
     lead_id = r.json()["lead"]["id"]
     resp = client.get("/internal/handoffs", params={"source": "handoffinfo"})
@@ -2156,7 +2161,7 @@ def test_handoff_csv_columns():
     """CSV has the expected column headers."""
     client.post("/leads", json={
         "name": "CSV Col", "email": "csvcol@hcsv.com",
-        "source": "hcsvtest", "notes": "real notes",
+        "source": "hcsvtest", "notes": STRONG_NOTES,
     })
     resp = client.get("/internal/handoffs/export.csv", params={"source": "hcsvtest"})
     rows = _parse_csv(resp.text)
@@ -2168,7 +2173,7 @@ def test_handoff_csv_data_matches_json():
     source = "hcsvmatch"
     client.post("/leads", json={
         "name": "CSV Match", "email": "csvmatch@hcsv.com",
-        "source": source, "notes": "real notes",
+        "source": source, "notes": STRONG_NOTES,
     })
     json_resp = client.get("/internal/handoffs", params={"source": source})
     csv_resp = client.get("/internal/handoffs/export.csv", params={"source": source})
@@ -2182,7 +2187,7 @@ def test_handoff_csv_excludes_claimed():
     """Claimed leads do not appear in handoff CSV."""
     r = client.post("/leads", json={
         "name": "CSV Excl", "email": "csvexcl@hcsv.com",
-        "source": "hcsvexcl", "notes": "real notes",
+        "source": "hcsvexcl", "notes": STRONG_NOTES,
     })
     lead_id = r.json()["lead"]["id"]
     resp_before = client.get("/internal/handoffs/export.csv", params={"source": "hcsvexcl"})
@@ -2200,7 +2205,7 @@ def test_handoff_csv_action_filter():
     """Action filter works on CSV export."""
     client.post("/leads", json={
         "name": "CSV Act", "email": "csvact@hcsv.com",
-        "source": "hcsvact", "notes": "real notes",
+        "source": "hcsvact", "notes": STRONG_NOTES,
     })
     resp = client.get("/internal/handoffs/export.csv", params={
         "source": "hcsvact", "action": "review_manually",
@@ -2214,7 +2219,7 @@ def test_handoff_csv_sanitizes_injection():
     """CSV values starting with dangerous chars are sanitized."""
     client.post("/leads", json={
         "name": "=EVIL()", "email": "csvinj@hcsv.com",
-        "source": "hcsvinj", "notes": "real notes",
+        "source": "hcsvinj", "notes": STRONG_NOTES,
     })
     resp = client.get("/internal/handoffs/export.csv", params={"source": "hcsvinj"})
     rows = _parse_csv(resp.text)
@@ -2277,7 +2282,7 @@ def test_review_excludes_claimed():
     """Claimed leads do not appear in review queue."""
     r = client.post("/leads", json={
         "name": "Review Excl", "email": "reviewexcl@review.com",
-        "source": "reviewexcl", "notes": "real notes for review",
+        "source": "reviewexcl", "notes": STRONG_NOTES,
     })
     lead_id = r.json()["lead"]["id"]
     resp_before = client.get("/internal/review", params={"source": "reviewexcl"})
@@ -2309,7 +2314,7 @@ def test_review_source_filter():
     """Source filter works on review queue."""
     client.post("/leads", json={
         "name": "Review Src", "email": "reviewsrc@review.com",
-        "source": "reviewsrc", "notes": "real notes",
+        "source": "reviewsrc", "notes": STRONG_NOTES,
     })
     resp = client.get("/internal/review", params={"source": "reviewsrc"})
     data = resp.json()
@@ -2324,9 +2329,9 @@ def test_review_urgent_count_from_full_set():
     for i in range(3):
         client.post("/leads", json={
             "name": f"Urgent {i}", "email": f"urgent{i}@reviewurgent.com",
-            "source": source, "notes": "premium lead interested",
+            "source": source, "notes": STRONG_NOTES,
         })
-    # All these leads have score 60 → send_to_client → alert=true
+    # All these leads have score >= 60 → send_to_client → alert=true
     resp_full = client.get("/internal/review", params={"source": source})
     full_urgent = resp_full.json()["urgent_count"]
     assert full_urgent >= 3
@@ -2340,7 +2345,7 @@ def test_review_item_contract():
     """Each review item has exactly the approved fields."""
     client.post("/leads", json={
         "name": "Review Contract", "email": "reviewcontract@review.com",
-        "source": "reviewcontract", "notes": "real notes for contract test",
+        "source": "reviewcontract", "notes": STRONG_NOTES,
     })
     resp = client.get("/internal/review", params={"source": "reviewcontract"})
     data = resp.json()
@@ -2359,7 +2364,7 @@ def test_review_claim_success():
     """Claiming a reviewable lead returns status claimed."""
     r = client.post("/leads", json={
         "name": "RClaim OK", "email": "rclaimok@rclaim.com",
-        "source": "rclaimtest", "notes": "real notes",
+        "source": "rclaimtest", "notes": STRONG_NOTES,
     })
     lead_id = r.json()["lead"]["id"]
     resp = client.post(f"/internal/review/{lead_id}/claim")
@@ -2373,7 +2378,7 @@ def test_review_claim_already_claimed():
     """Re-claiming a lead returns status already_claimed."""
     r = client.post("/leads", json={
         "name": "RClaim Dup", "email": "rclaimdup@rclaim.com",
-        "source": "rclaimtest", "notes": "real notes",
+        "source": "rclaimtest", "notes": STRONG_NOTES,
     })
     lead_id = r.json()["lead"]["id"]
     client.post(f"/internal/review/{lead_id}/claim")
@@ -2410,7 +2415,7 @@ def test_review_claim_removes_from_review():
     """Claimed lead disappears from GET /internal/review."""
     r = client.post("/leads", json={
         "name": "RClaim Gone", "email": "rclaimgone@rclaim.com",
-        "source": "rclaimgone", "notes": "real notes",
+        "source": "rclaimgone", "notes": STRONG_NOTES,
     })
     lead_id = r.json()["lead"]["id"]
     resp_before = client.get("/internal/review", params={"source": "rclaimgone"})
@@ -2426,7 +2431,7 @@ def test_review_claim_removes_from_dispatch():
     """Claimed via review also disappears from GET /internal/dispatch."""
     r = client.post("/leads", json={
         "name": "RClaim Disp", "email": "rclaimdisp@rclaim.com",
-        "source": "rclaimdisp", "notes": "real notes",
+        "source": "rclaimdisp", "notes": STRONG_NOTES,
     })
     lead_id = r.json()["lead"]["id"]
     resp_before = client.get("/internal/dispatch", params={"source": "rclaimdisp"})
@@ -3009,9 +3014,9 @@ def test_action_consistent_with_scoring_on_ext():
 
     notes_ext_only = '@ext:{"phone":"+34111222333"}'
     score = calculate_lead_score("test", notes_ext_only)
-    assert score == 25  # base 20 + test source 5
+    assert score == 30  # base 20 + test source 5 + notes non-empty 5
     action = determine_next_action(score, notes_ext_only)
-    assert action == "enrich_first"  # score < 40 with notes
+    assert action == "enrich_first"  # score < 40
 
 
 def test_action_via_endpoint_ext_only_lead():
@@ -3175,7 +3180,7 @@ def test_source_filter_normalized_in_actionable():
     """Source normalization applies to actionable endpoint too."""
     client.post("/leads", json={
         "name": "Act Norm", "email": "actnorm@h20.com",
-        "source": "h20_actionable", "notes": "real notes",
+        "source": "h20_actionable", "notes": STRONG_NOTES,
     })
     resp = client.get("/leads/actionable", params={"source": "  H20_Actionable  "})
     assert resp.status_code == 200
@@ -3397,7 +3402,7 @@ def test_ops_snapshot_claimed_reflects_claims():
         "name": "Claim Snap Lead",
         "email": "claimsnap@example.com",
         "source": "opssnaptest",
-        "notes": "notes for score",
+        "notes": STRONG_NOTES,
     }
     create_resp = client.post("/leads", json=lead)
     assert create_resp.status_code == 200
@@ -3485,7 +3490,7 @@ def test_client_ready_excludes_claimed():
         "name": "Claim Ready Lead",
         "email": "claimready@example.com",
         "source": "clientreadytest",
-        "notes": "notes for score",
+        "notes": STRONG_NOTES,
     }
     create_resp = client.post("/leads", json=lead)
     assert create_resp.status_code == 200
@@ -3584,8 +3589,8 @@ def test_worklist_recently_claimed_ordered_by_claimed_at_desc():
 # --- Claim Release ---
 
 def _create_and_claim_lead(name: str, email: str, source: str = "releasetest") -> int:
-    """Helper: create a lead with notes, claim it, return lead_id."""
-    lead = {"name": name, "email": email, "source": source, "notes": "notes for score"}
+    """Helper: create a lead with strong notes, claim it, return lead_id."""
+    lead = {"name": name, "email": email, "source": source, "notes": STRONG_NOTES}
     resp = client.post("/leads", json=lead)
     assert resp.status_code == 200
     lead_id = resp.json()["lead"]["id"]
@@ -3678,14 +3683,14 @@ def test_demo_intake_end_to_end():
         "name": "Demo E2E Lead",
         "email": "demoe2e@example.com",
         "source": "landing:demo-test",
-        "notes": "submitted via demo form",
+        "notes": STRONG_NOTES,
     }
     resp = client.post("/leads/external", json=payload)
     assert resp.status_code == 200
     data = resp.json()
     assert data["status"] == "accepted"
     lead_id = data["lead_id"]
-    # Lead has notes -> score 60 -> send_to_client -> appears in client-ready
+    # Lead with strong notes -> score >= 60 -> send_to_client -> appears in client-ready
     ready_ids = {item["lead_id"] for item in client.get("/internal/client-ready").json()["items"]}
     assert lead_id in ready_ids
 
@@ -3835,11 +3840,11 @@ def test_source_actions_insufficient_data():
 def test_source_actions_keep_high_client_ready():
     """Source with >= 50% client_ready rate gets 'keep' / 'high client_ready rate'."""
     src = "action:highcr"
-    # All leads with notes -> score 60 -> send_to_client
+    # All leads with strong notes -> score >= 60 -> send_to_client
     for i in range(4):
         client.post("/leads", json={
             "name": f"CR{i}", "email": f"cr{i}@action-highcr.com",
-            "source": src, "notes": "good lead"
+            "source": src, "notes": STRONG_NOTES
         })
     resp = client.get("/internal/source-actions")
     item = {i["source"]: i for i in resp.json()["items"]}[src]
@@ -3850,21 +3855,21 @@ def test_source_actions_keep_high_client_ready():
 def test_source_actions_keep_strong_avg_score():
     """Source with avg_score >= 55 but < 50% client_ready gets 'keep' / 'strong avg score'."""
     src = "action:strongavg"
-    # Mix: 2 with notes (score 60) + 2 without (score 50) = avg 55
+    # Mix: 2 with strong notes (score ~60) + 2 with medium notes (score ~50) = avg ~55
     for i in range(2):
         client.post("/leads", json={
             "name": f"SN{i}", "email": f"sn{i}@action-strongavg.com",
-            "source": src, "notes": "noted"
+            "source": src, "notes": STRONG_NOTES
         })
     for i in range(2):
         client.post("/leads", json={
             "name": f"SB{i}", "email": f"sb{i}@action-strongavg.com",
-            "source": src
+            "source": src, "notes": "Tipo: Velero\nTeléfono: +34612345678"
         })
     resp = client.get("/internal/source-actions")
     item = {i["source"]: i for i in resp.json()["items"]}[src]
-    # 2 client_ready / 4 actionable = 0.5 -> hits client_ready rule first
-    # Need to check which rule fires
+    # All have score >= 40 -> actionable. 2 with score >= 60 -> client_ready
+    # 2/4 = 50% -> hits client_ready rule
     assert item["recommendation"] == "keep"
 
 
@@ -3983,7 +3988,7 @@ def test_event_review_claim_emits_claimed():
     """Claiming via review endpoint also emits lead.claimed with origin_module=review."""
     resp = client.post("/leads", json={
         "name": "Review Claim Event", "email": "event-review-claim@example.com",
-        "source": "event:reviewclaim", "notes": "important",
+        "source": "event:reviewclaim", "notes": STRONG_NOTES,
     })
     lead_id = resp.json()["lead"]["id"]
     client.post(f"/internal/review/{lead_id}/claim")
