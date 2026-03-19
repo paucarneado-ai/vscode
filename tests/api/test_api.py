@@ -4297,8 +4297,21 @@ def test_audit_finding_fields():
         assert isinstance(f["detail"], dict)
 
 
+def _reset_to_own_db():
+    """Reset DB connection back to this module's temp file.
+
+    Other test files (test_auth, test_lead_status, etc.) overwrite the global
+    DATABASE_PATH at import time. The audit tests need a clean DB to verify
+    arithmetic invariants, so we restore this module's DB path and reinit.
+    """
+    db_module.DATABASE_PATH = _tmp.name
+    db_module.reset_db()
+    db_module.init_db()
+
+
 def test_audit_status_pass_when_clean():
-    """With normal data, both checks should pass and status should be 'pass'."""
+    """With clean data, both checks should pass and status should be 'pass'."""
+    _reset_to_own_db()
     resp = client.get("/internal/audit")
     data = resp.json()
     assert data["status"] == "pass"
