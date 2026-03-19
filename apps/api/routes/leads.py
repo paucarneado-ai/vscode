@@ -430,7 +430,8 @@ def _get_actionable_leads(
     """Return actionable leads as LeadOperationalSummary list."""
     db = get_db()
     conditions: list[str] = [
-        "(score >= 40 OR (notes IS NOT NULL AND TRIM(notes) != ''))"
+        "(score >= 40 OR (notes IS NOT NULL AND TRIM(notes) != ''))",
+        "status NOT IN ('closed', 'not_interested')",
     ]
     params: list[str | int] = []
     if source is not None:
@@ -453,6 +454,7 @@ def _get_actionable_leads(
             name=lead["name"],
             source=lead["source"],
             score=lead["score"],
+            status=lead.get("status", "new"),
             rating=rating,
             next_action=next_action,
             instruction=get_instruction(next_action),
@@ -576,6 +578,7 @@ def get_lead_pack(lead_id: int) -> LeadPackResponse:
         source=lead["source"],
         notes=lead["notes"],
         score=lead["score"],
+        status=lead.get("status", "new"),
         rating=rating,
         summary=summary,
         next_action=next_action,
@@ -598,11 +601,15 @@ def get_lead_pack_text(lead_id: int) -> PlainTextResponse:
 @router.get("/leads/{lead_id}/operational", response_model=LeadOperationalSummary)
 def get_lead_operational(lead_id: int) -> LeadOperationalSummary:
     pack = get_lead_pack(lead_id)
+    db = get_db()
+    row = db.execute("SELECT status FROM leads WHERE id = ?", (pack.lead_id,)).fetchone()
+    status = row["status"] if row else "new"
     return LeadOperationalSummary(
         lead_id=pack.lead_id,
         name=pack.name,
         source=pack.source,
         score=pack.score,
+        status=status,
         rating=pack.rating,
         next_action=pack.next_action,
         instruction=get_instruction(pack.next_action),

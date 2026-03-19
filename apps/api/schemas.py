@@ -60,6 +60,7 @@ class LeadPackResponse(BaseModel):
     source: str
     notes: str | None = None
     score: int
+    status: str = "new"
     rating: str
     summary: str
     next_action: str
@@ -77,6 +78,7 @@ class LeadOperationalSummary(BaseModel):
     name: str
     source: str
     score: int
+    status: str = "new"
     rating: str
     next_action: str
     instruction: str

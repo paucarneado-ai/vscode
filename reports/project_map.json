@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-03-19T03:55:38.845186+00:00",
+  "generated_at": "2026-03-19T04:33:34.103053+00:00",
   "version": 2,
   "seed_maps_used": {
     "audit": "docs/openclaw_built_state_audit.md",
@@ -619,7 +619,7 @@
       "file": "apps/api/schemas.py",
       "functions": 0,
       "classes": 75,
-      "lines": 634,
+      "lines": 636,
       "internal_imports": [],
       "deprecated": false,
       "provenance": "detected_from_code"
@@ -692,7 +692,7 @@
       "file": "apps/api/routes/leads.py",
       "functions": 26,
       "classes": 0,
-      "lines": 634,
+      "lines": 641,
       "internal_imports": [
         "apps.api.auth",
         "apps.api.db",
@@ -1813,7 +1813,7 @@
   ],
   "temporal_diff": {
     "available": true,
-    "previous_generated_at": "2026-03-19T03:55:38.261340+00:00",
+    "previous_generated_at": "2026-03-19T04:33:33.635124+00:00",
     "files_added": [],
     "files_removed": [],
     "category_changes": {}
