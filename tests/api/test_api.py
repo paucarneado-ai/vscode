@@ -2941,10 +2941,33 @@ def test_scoring_normal_notes_still_gets_bonus():
     assert resp.json()["lead"]["score"] == 30
 
 
-@pytest.mark.skip(reason="scoring.py replaced with OpenClaw version; _has_user_notes no longer exists")
-def test_scoring_unit_has_user_notes():
-    """Unit test for _has_user_notes helper."""
-    pass
+def test_scoring_notes_impact_on_score():
+    """Scoring responds correctly to different notes content.
+
+    Replaces the old test_scoring_unit_has_user_notes which tested a private
+    helper that no longer exists. Tests observable behavior instead.
+    """
+    from apps.api.services.scoring import calculate_lead_score
+
+    base_no_notes = calculate_lead_score("test", None)
+
+    # No notes — baseline score
+    assert calculate_lead_score("test", None) == 25
+    assert calculate_lead_score("test", "") == 25
+    assert calculate_lead_score("test", "   ") == 25
+
+    # Real notes add +5 (non-empty text bonus)
+    assert calculate_lead_score("test", "interested in boats") == base_no_notes + 5
+
+    # @ext: metadata is non-empty text — also gets notes bonus
+    assert calculate_lead_score("test", '@ext:{"phone":"+34111"}') == base_no_notes + 5
+
+    # Real notes + @ext: same as notes-only (no double bonus)
+    assert calculate_lead_score("test", 'Real inquiry\n\n@ext:{"phone":"+34111"}') == base_no_notes + 5
+
+    # Boat-type signal adds more than just notes bonus
+    score_with_tipo = calculate_lead_score("test", "Tipo: Velero")
+    assert score_with_tipo > base_no_notes + 5  # boat_type signal fires
 
 
 # --- H8: CSV injection sanitization ---
