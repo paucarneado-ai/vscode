@@ -615,7 +615,10 @@ class FollowupQueueResponse(BaseModel):
     total: int
     items: list[FollowupItem]
 
-# --- Added by rescue/openclaw-import-phase1 ---
+# --- TEMPORARY: rescue/openclaw-import-phase1 ---
+# These definitions are required by apps/api/services/intake.py (imported in phase 1).
+# They must be properly merged into this file during phase 2.
+# Do not add more definitions here — resolve in phase 2 merge instead.
 
 VALID_LEAD_STATUSES = {"new", "contacted", "closed", "not_interested"}
 
