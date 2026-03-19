@@ -614,3 +614,20 @@ class FollowupQueueResponse(BaseModel):
     generated_at: str
     total: int
     items: list[FollowupItem]
+
+# --- Added by rescue/openclaw-import-phase1 ---
+
+VALID_LEAD_STATUSES = {"new", "contacted", "closed", "not_interested"}
+
+
+class LeadStatusUpdate(BaseModel):
+    status: str = Field(min_length=1)
+
+
+class WebIntakePayload(BaseModel):
+    nombre: str = Field(min_length=1)
+    email: EmailStr
+    telefono: str | None = None
+    interes: str | None = None
+    mensaje: str | None = None
+    origen: str | None = None

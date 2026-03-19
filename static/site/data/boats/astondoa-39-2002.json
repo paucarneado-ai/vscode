@@ -1,0 +1,56 @@
+{
+  "slug": "astondoa-39-2002",
+  "name": "Astondoa 39",
+  "brand": "Astondoa",
+  "type": "motor",
+  "year": 2002,
+  "price": 129000,
+  "length": 11.95,
+  "beam": 3.9,
+  "draft": 1.1,
+  "location": "El Masnou",
+  "condition": "used",
+  "badges": [
+    "stock",
+    "price-drop"
+  ],
+  "engines": "2× Volvo 310 CV",
+  "fuel": "Diésel",
+  "cabins": 2,
+  "berths": 4,
+  "heads": 1,
+  "description": {
+    "es": "Astondoa 39 compacto y manejable, perfecto para escapadas de fin de semana. Dos cabinas, un baño, bañera amplia. Amarre disponible en el Port Esportiu de El Masnou.",
+    "en": "Compact and manageable Astondoa 39, perfect for weekend getaways. Two cabins, one head, spacious cockpit. Berth available at Port Esportiu de El Masnou."
+  },
+  "specs": {
+    "es": {
+      "Eslora": "11,95 m",
+      "Manga": "3,90 m",
+      "Calado": "1,10 m",
+      "Motor": "2× Volvo 310 CV",
+      "Combustible": "Diésel",
+      "Cabinas": "2",
+      "Literas": "4",
+      "Baños": "1",
+      "Año": "2002",
+      "Puerto": "El Masnou"
+    },
+    "en": {
+      "Length": "11.95 m",
+      "Beam": "3.90 m",
+      "Draft": "1.10 m",
+      "Engine": "2× Volvo 310 HP",
+      "Fuel": "Diesel",
+      "Cabins": "2",
+      "Berths": "4",
+      "Heads": "1",
+      "Year": "2002",
+      "Port": "El Masnou"
+    }
+  },
+  "images": [
+    "astondoa-39-1.jpg"
+  ],
+  "visible": true
+}

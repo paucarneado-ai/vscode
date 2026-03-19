@@ -1,0 +1,55 @@
+{
+  "slug": "grand-banks-38-eastbay-ex-2002",
+  "name": "Grand Banks 38 Eastbay EX",
+  "brand": "Grand Banks",
+  "type": "motor",
+  "year": 2002,
+  "price": 175000,
+  "length": 12.45,
+  "beam": 4.05,
+  "draft": 1.02,
+  "location": "El Masnou",
+  "condition": "used",
+  "badges": [
+    "new"
+  ],
+  "engines": "2× Caterpillar 420 CV",
+  "fuel": "Diésel",
+  "cabins": 2,
+  "berths": 4,
+  "heads": 1,
+  "description": {
+    "es": "Grand Banks 38 Eastbay EX, referencia en trawlers de calidad. Construcción robusta, dos cabinas, un baño. Navegación eficiente y cómoda. Perfecto para crucero costero y vivir a bordo.",
+    "en": "Grand Banks 38 Eastbay EX, the benchmark in quality trawlers. Robust construction, two cabins, one head. Efficient and comfortable cruising. Perfect for coastal cruising and liveaboard."
+  },
+  "specs": {
+    "es": {
+      "Eslora": "12,45 m",
+      "Manga": "4,05 m",
+      "Calado": "1,02 m",
+      "Motor": "2× Caterpillar 420 CV",
+      "Combustible": "Diésel",
+      "Cabinas": "2",
+      "Literas": "4",
+      "Baños": "1",
+      "Año": "2002",
+      "Puerto": "El Masnou"
+    },
+    "en": {
+      "Length": "12.45 m",
+      "Beam": "4.05 m",
+      "Draft": "1.02 m",
+      "Engine": "2× Caterpillar 420 HP",
+      "Fuel": "Diesel",
+      "Cabins": "2",
+      "Berths": "4",
+      "Heads": "1",
+      "Year": "2002",
+      "Port": "El Masnou"
+    }
+  },
+  "images": [
+    "grand-banks-38-eastbay-ex-1.jpg"
+  ],
+  "visible": true
+}

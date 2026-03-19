@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SentYacht — Admin</title>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0B1220; color: #F2EDE8; min-height: 100vh; }
+    .header { background: #0a1929; border-bottom: 1px solid #1E3148; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+    .header h1 { font-size: 1.1rem; font-weight: 600; }
+    .header h1 span { color: #C9A96E; }
+    .header-actions { display: flex; gap: 10px; align-items: center; }
+    .main { max-width: 1100px; margin: 0 auto; padding: 24px; }
+    .auth-screen { display: flex; align-items: center; justify-content: center; min-height: 80vh; }
+    .auth-box { background: #142233; border: 1px solid #1E3148; border-radius: 8px; padding: 32px; width: 380px; text-align: center; }
+    .auth-box h2 { margin-bottom: 8px; font-size: 1.1rem; }
+    .auth-box p { color: #8A9BB5; font-size: 0.82rem; margin-bottom: 20px; }
+    .auth-box input { width: 100%; padding: 10px 14px; border-radius: 4px; border: 1px solid #1E3148; background: #0B1220; color: #F2EDE8; font-size: 0.9rem; margin-bottom: 12px; }
+    .auth-box input:focus { outline: none; border-color: #C9A96E; }
+    .btn { padding: 8px 16px; border-radius: 4px; border: none; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+    .btn-primary { background: #C9A96E; color: #0a1e30; }
+    .btn-primary:hover { background: #e0c06a; }
+    .btn-secondary { background: #1E3148; color: #F2EDE8; }
+    .btn-secondary:hover { background: #2a4060; }
+    .btn-success { background: #16a34a; color: #fff; }
+    .btn-success:hover { background: #15803d; }
+    .btn-danger { background: #dc2626; color: #fff; }
+    .btn-danger:hover { background: #b91c1c; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-sm { padding: 5px 12px; font-size: 0.78rem; }
+    .status-bar { padding: 10px 16px; border-radius: 4px; font-size: 0.82rem; margin-bottom: 16px; display: none; }
+    .status-bar.visible { display: block; }
+    .status-bar.success { background: #052e16; color: #4ade80; border: 1px solid #166534; }
+    .status-bar.error { background: #2a0a0a; color: #f87171; border: 1px solid #7f1d1d; }
+    .status-bar.info { background: #0c1a2e; color: #60a5fa; border: 1px solid #1e3a5f; }
+    .status-bar.warning { background: #2a1f04; color: #fbbf24; border: 1px solid #854d0e; }
+    .section-title { font-size: 1rem; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; }
+    .boat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+    .boat-card { background: #142233; border: 1px solid #1E3148; border-radius: 6px; overflow: hidden; cursor: pointer; transition: border-color 0.2s, transform 0.15s; }
+    .boat-card:hover { border-color: #C9A96E; transform: translateY(-2px); }
+    .boat-card-hero { aspect-ratio: 16/9; background: #1E3148; overflow: hidden; position: relative; }
+    .boat-card-hero img { width: 100%; height: 100%; object-fit: cover; }
+    .boat-card-hero .no-hero { display: flex; align-items: center; justify-content: center; height: 100%; color: #8A9BB5; font-size: 0.8rem; }
+    .boat-card-info { padding: 12px 14px; }
+    .boat-card-name { font-weight: 600; font-size: 0.92rem; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+    .boat-card-meta { color: #8A9BB5; font-size: 0.78rem; display: flex; gap: 12px; }
+    .boat-card-badge { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.7); color: #8A9BB5; font-size: 0.68rem; padding: 2px 8px; border-radius: 10px; }
+    .badge-vis { font-size: 0.65rem; padding: 1px 6px; border-radius: 8px; font-weight: 600; }
+    .badge-vis.published { background: #052e16; color: #4ade80; }
+    .badge-vis.draft { background: #2a1f04; color: #fbbf24; }
+    .edit-header { margin-bottom: 20px; }
+    .edit-header h2 { font-size: 1.1rem; margin-bottom: 4px; display: flex; align-items: center; gap: 10px; }
+    .edit-meta { color: #8A9BB5; font-size: 0.8rem; display: flex; gap: 16px; flex-wrap: wrap; }
+    .edit-meta code { background: #1E3148; padding: 1px 6px; border-radius: 3px; font-size: 0.78rem; }
+    .edit-actions { display: flex; gap: 10px; margin: 16px 0; flex-wrap: wrap; align-items: center; }
+    .unsaved-indicator { color: #fbbf24; font-size: 0.8rem; font-weight: 600; display: none; }
+    .unsaved-indicator.visible { display: inline; }
+    /* Tabs */
+    .tab-bar { display: flex; gap: 0; margin-bottom: 16px; border-bottom: 1px solid #1E3148; }
+    .tab-btn { padding: 10px 20px; font-size: 0.85rem; font-weight: 600; background: none; border: none; color: #8A9BB5; cursor: pointer; border-bottom: 2px solid transparent; transition: color 0.2s, border-color 0.2s; }
+    .tab-btn.active { color: #C9A96E; border-bottom-color: #C9A96E; }
+    .tab-btn:hover { color: #F2EDE8; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    /* Form */
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 0.82rem; color: #8A9BB5; margin-bottom: 4px; }
+    .form-group input, .form-group select { width: 100%; max-width: 400px; padding: 8px 12px; border-radius: 4px; border: 1px solid #1E3148; background: #0B1220; color: #F2EDE8; font-size: 0.85rem; }
+    .form-group textarea { width: 100%; padding: 8px 12px; border-radius: 4px; border: 1px solid #1E3148; background: #0B1220; color: #F2EDE8; font-size: 0.85rem; font-family: inherit; resize: vertical; }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: #C9A96E; }
+    .form-group .hint { color: #5a6d82; font-size: 0.75rem; margin-top: 3px; }
+    .form-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
+    .form-section { margin: 20px 0 12px; font-size: 0.82rem; font-weight: 600; color: #C9A96E; text-transform: uppercase; letter-spacing: 0.1em; padding-bottom: 4px; border-bottom: 1px solid #1E3148; }
+    .badge-toggle { display: inline-flex; align-items: center; gap: 6px; margin-right: 12px; font-size: 0.82rem; color: #8A9BB5; cursor: pointer; }
+    .badge-toggle input { accent-color: #C9A96E; }
+    .slug-preview { background: #142233; border: 1px solid #1E3148; border-radius: 4px; padding: 10px 14px; font-size: 0.82rem; color: #8A9BB5; margin: 16px 0; }
+    .slug-preview code { color: #F2EDE8; }
+    .next-steps { background: #142233; border: 1px solid #1E3148; border-radius: 6px; padding: 16px; margin-top: 20px; font-size: 0.82rem; line-height: 1.7; color: #8A9BB5; }
+    .next-steps strong { color: #F2EDE8; }
+    .next-steps ol, .next-steps ul { padding-left: 20px; }
+    /* Gallery */
+    .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-top: 12px; }
+    .gallery-item { position: relative; aspect-ratio: 4/3; overflow: hidden; border-radius: 4px; cursor: grab; border: 2px solid transparent; transition: border-color 0.2s, opacity 0.2s; }
+    .gallery-item:active { cursor: grabbing; }
+    .gallery-item img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+    .gallery-item .label { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.75); color: #fff; font-size: 0.68rem; padding: 3px 6px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .gallery-item.hero-marker { border-color: #C9A96E; }
+    .gallery-item.hero-marker .label { background: #C9A96E; color: #0a1e30; font-weight: 600; }
+    .gallery-item .img-error { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; background: #1E3148; color: #8A9BB5; font-size: 0.68rem; text-align: center; padding: 6px; }
+    .sortable-ghost { opacity: 0.3; }
+    .sortable-chosen { border-color: #C9A96E; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+    .regen-output { background: #0a0a0a; border: 1px solid #1E3148; border-radius: 4px; padding: 12px; font-family: monospace; font-size: 0.75rem; color: #8A9BB5; white-space: pre-wrap; max-height: 300px; overflow-y: auto; margin-top: 12px; display: none; }
+    .regen-output.visible { display: block; }
+    .view { display: none; }
+    .view.active { display: block; }
+    .loading { color: #8A9BB5; font-size: 0.85rem; padding: 40px; text-align: center; }
+  </style>
+</head>
+<body>
+
+  <div id="auth-screen" class="auth-screen">
+    <div class="auth-box">
+      <h2>SentYacht Admin</h2>
+      <p>Introduce la API key para acceder al panel de gestión.</p>
+      <input type="password" id="api-key-input" placeholder="API Key" autocomplete="off">
+      <button class="btn btn-primary" style="width:100%" onclick="doLogin()">Acceder</button>
+      <div id="auth-error" style="color:#f87171; font-size:0.8rem; margin-top:10px; display:none;"></div>
+    </div>
+  </div>
+
+  <div id="app" style="display:none;">
+    <div class="header">
+      <h1><span>SentYacht</span> Admin</h1>
+      <div class="header-actions">
+        <button class="btn btn-secondary btn-sm" onclick="showView('list')">Barcos</button>
+        <button class="btn btn-secondary btn-sm" onclick="showView('create')">+ Nuevo barco</button>
+        <button class="btn btn-sm" style="background:#1E3148; color:#8A9BB5;" onclick="doLogout()">Salir</button>
+      </div>
+    </div>
+
+    <div class="main">
+      <div id="status-bar" class="status-bar"></div>
+
+      <!-- LIST VIEW -->
+      <div id="view-list" class="view active">
+        <div class="section-title">
+          <span>Barcos</span>
+          <button class="btn btn-secondary btn-sm" onclick="loadBoats()">Actualizar</button>
+        </div>
+        <div id="boat-grid" class="boat-grid"><div class="loading">Cargando barcos...</div></div>
+      </div>
+
+      <!-- EDIT VIEW -->
+      <div id="view-edit" class="view">
+        <div class="edit-header">
+          <button class="btn btn-secondary btn-sm" onclick="showView('list')" style="margin-bottom:12px;">&larr; Volver a barcos</button>
+          <h2>
+            <span id="edit-boat-name"></span>
+            <span class="badge-vis" id="edit-vis-badge"></span>
+          </h2>
+          <div class="edit-meta">
+            <span>Slug: <code id="edit-boat-slug"></code></span>
+            <span>Carpeta: <code id="edit-boat-dir"></code></span>
+            <span id="edit-boat-count"></span>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tab-bar">
+          <button class="tab-btn active" onclick="switchTab('text')">Texto</button>
+          <button class="tab-btn" onclick="switchTab('images')">Imágenes</button>
+        </div>
+
+        <!-- TAB: TEXT -->
+        <div id="tab-text" class="tab-content active">
+          <div class="edit-actions">
+            <button class="btn btn-primary" onclick="saveBoatData()">Guardar borrador</button>
+            <button class="btn btn-success" onclick="saveAndBuild()">Guardar y publicar</button>
+            <button class="btn btn-secondary btn-sm" onclick="window.open('/es/barcos/'+currentSlug+'/', '_blank')">Previsualizar ES</button>
+            <button class="btn btn-secondary btn-sm" onclick="window.open('/en/boats/'+currentSlug+'/', '_blank')">Previsualizar EN</button>
+            <button class="btn btn-sm" id="toggle-vis-btn" onclick="toggleVisibility()">Publicar</button>
+          </div>
+
+          <div class="form-section">Básico</div>
+          <div class="form-row">
+            <div class="form-group"><label>Nombre</label><input id="f-name" type="text"></div>
+            <div class="form-group"><label>Marca</label><input id="f-brand" type="text"></div>
+            <div class="form-group">
+              <label>Tipo</label>
+              <select id="f-type"><option value="motor">Motor</option><option value="sail">Velero</option></select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Año</label><input id="f-year" type="number" min="0"></div>
+            <div class="form-group"><label>Precio (EUR)</label><input id="f-price" type="number" min="0"></div>
+            <div class="form-group"><label>Ubicación</label><input id="f-location" type="text"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Condición</label>
+              <select id="f-condition"><option value="used">Usado</option><option value="new">Nuevo</option></select>
+            </div>
+            <div class="form-group"><label>Imagen catálogo</label><input id="f-catalog-img" type="text" placeholder="marca-modelo-1.jpg"><div class="hint">Thumbnail para listados (en /assets/)</div></div>
+          </div>
+
+          <div class="form-section">Dimensiones y mecánica</div>
+          <div class="form-row">
+            <div class="form-group"><label>Eslora (m)</label><input id="f-length" type="number" step="0.01" min="0"></div>
+            <div class="form-group"><label>Manga (m)</label><input id="f-beam" type="number" step="0.01" min="0"></div>
+            <div class="form-group"><label>Calado (m)</label><input id="f-draft" type="number" step="0.01" min="0"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Motor</label><input id="f-engines" type="text" placeholder="2x MAN 1360 CV"></div>
+            <div class="form-group"><label>Combustible</label><input id="f-fuel" type="text" placeholder="Diésel"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Cabinas</label><input id="f-cabins" type="number" min="0"></div>
+            <div class="form-group"><label>Literas</label><input id="f-berths" type="number" min="0"></div>
+            <div class="form-group"><label>Baños</label><input id="f-heads" type="number" min="0"></div>
+          </div>
+
+          <div class="form-section">Badges</div>
+          <div style="margin-bottom:14px;">
+            <label class="badge-toggle"><input type="checkbox" id="f-badge-stock"> En stock</label>
+            <label class="badge-toggle"><input type="checkbox" id="f-badge-new"> Novedad</label>
+            <label class="badge-toggle"><input type="checkbox" id="f-badge-price-drop"> Precio rebajado</label>
+          </div>
+
+          <div class="form-section">Descripción</div>
+          <div class="form-group"><label>Descripción ES</label><textarea id="f-desc-es" rows="4"></textarea></div>
+          <div class="form-group"><label>Descripción EN</label><textarea id="f-desc-en" rows="4"></textarea></div>
+
+          <div class="form-section">Especificaciones</div>
+          <div class="form-group"><label>Specs ES (una por línea: <code>Eslora: 24,99 m</code>)</label><textarea id="f-specs-es" rows="10" style="font-family:monospace; font-size:0.8rem;"></textarea></div>
+          <div class="form-group"><label>Specs EN (una por línea: <code>Length: 24.99 m</code>)</label><textarea id="f-specs-en" rows="10" style="font-family:monospace; font-size:0.8rem;"></textarea></div>
+        </div>
+
+        <!-- TAB: IMAGES -->
+        <div id="tab-images" class="tab-content">
+          <div class="edit-actions">
+            <button class="btn btn-primary" id="save-regen-btn" onclick="saveGalleryAndBuild()" disabled>Guardar y regenerar</button>
+            <button class="btn btn-secondary" id="save-gallery-btn" onclick="saveGallery()" disabled>Solo guardar orden</button>
+            <button class="btn btn-secondary" id="reset-gallery-btn" onclick="resetGallery()">Resetear</button>
+            <span class="unsaved-indicator" id="unsaved-indicator">cambios sin guardar</span>
+          </div>
+          <div id="edit-gallery" class="gallery"></div>
+        </div>
+
+        <div id="regen-output" class="regen-output"></div>
+      </div>
+
+      <!-- CREATE VIEW -->
+      <div id="view-create" class="view">
+        <div class="section-title"><span>Nuevo barco</span></div>
+        <div class="next-steps" style="margin-bottom:20px;">
+          <strong>Esto crea el esqueleto inicial del barco</strong> (directorio + manifest + datos JSON). El barco se crea como borrador (no publicado). Desde la vista de edición puedes rellenar todos los datos y publicar.
+        </div>
+        <div class="form-group">
+          <label>Nombre comercial</label>
+          <input type="text" id="create-name" placeholder="Astondoa 72 GLX" oninput="updateSlugPreview()">
+        </div>
+        <div class="form-group">
+          <label>Slug</label>
+          <input type="text" id="create-slug" placeholder="astondoa-72-glx-2024" oninput="updateSlugPreview()">
+          <div class="hint">Solo minúsculas, números y guiones.</div>
+        </div>
+        <div id="slug-preview" class="slug-preview" style="display:none;"></div>
+        <button class="btn btn-primary" onclick="createBoat()">Crear barco</button>
+        <div id="create-next-steps" class="next-steps" style="display:none;">
+          <strong>Barco creado como borrador.</strong> Ahora puedes:
+          <ol>
+            <li>Coloca los JPGs en <code id="next-step-dir"></code></li>
+            <li>Abre el barco desde la lista para editar texto e imágenes</li>
+            <li>Cuando esté listo, usa "Publicar" para hacerlo visible</li>
+          </ol>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    var API_KEY = '';
+    var currentSlug = '';
+    var currentBoatData = null;
+    var originalFiles = [];
+    var currentFiles = [];
+    var sortableInstance = null;
+
+    function getApiBase() { return window.location.origin; }
+
+    // --- Auth ---
+    function doLogin() {
+      var key = document.getElementById('api-key-input').value.trim();
+      if (!key) return;
+      API_KEY = key;
+      apiFetch('/internal/admin/boats').then(function(data) {
+        sessionStorage.setItem('sy_admin_key', key);
+        document.getElementById('auth-screen').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+        renderBoatGrid(data);
+      }).catch(function() {
+        document.getElementById('auth-error').textContent = 'API key incorrecta o servidor no disponible.';
+        document.getElementById('auth-error').style.display = 'block';
+      });
+    }
+    function doLogout() {
+      sessionStorage.removeItem('sy_admin_key');
+      API_KEY = '';
+      document.getElementById('app').style.display = 'none';
+      document.getElementById('auth-screen').style.display = 'flex';
+      document.getElementById('api-key-input').value = '';
+      document.getElementById('auth-error').style.display = 'none';
+    }
+    (function() {
+      var saved = sessionStorage.getItem('sy_admin_key');
+      if (saved) { document.getElementById('api-key-input').value = saved; doLogin(); }
+      document.getElementById('api-key-input').addEventListener('keydown', function(e) { if (e.key === 'Enter') doLogin(); });
+    })();
+
+    // --- API ---
+    function apiFetch(path, opts) {
+      opts = opts || {};
+      var headers = Object.assign({ 'X-API-Key': API_KEY }, opts.headers || {});
+      if (opts.body && typeof opts.body === 'object') { headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(opts.body); }
+      return fetch(getApiBase() + path, Object.assign({}, opts, { headers: headers }))
+        .then(function(res) {
+          if (!res.ok) return res.text().then(function(t) { var msg; try { msg = JSON.parse(t).detail; } catch(e) { msg = t; } throw new Error(msg || 'Error ' + res.status); });
+          return res.json();
+        });
+    }
+
+    // --- Status ---
+    function showStatus(msg, type) {
+      var bar = document.getElementById('status-bar');
+      bar.textContent = msg; bar.className = 'status-bar visible ' + (type || 'info');
+      if (type === 'success' || type === 'info') setTimeout(function() { bar.className = 'status-bar'; }, 5000);
+    }
+    function clearStatus() { document.getElementById('status-bar').className = 'status-bar'; }
+
+    // --- Views ---
+    function showView(name) {
+      clearStatus();
+      document.querySelectorAll('.view').forEach(function(v) { v.classList.remove('active'); });
+      document.getElementById('view-' + name).classList.add('active');
+      if (name === 'list') loadBoats();
+      if (name === 'create') {
+        document.getElementById('create-name').value = '';
+        document.getElementById('create-slug').value = '';
+        document.getElementById('slug-preview').style.display = 'none';
+        document.getElementById('create-next-steps').style.display = 'none';
+      }
+    }
+    function showView_raw(name) {
+      clearStatus();
+      document.querySelectorAll('.view').forEach(function(v) { v.classList.remove('active'); });
+      document.getElementById('view-' + name).classList.add('active');
+    }
+
+    // --- Tabs ---
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+      document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
+      document.getElementById('tab-' + tab).classList.add('active');
+      event.target.classList.add('active');
+    }
+
+    // --- Boat List ---
+    function loadBoats() {
+      apiFetch('/internal/admin/boats').then(renderBoatGrid).catch(function(e) { showStatus('Error cargando barcos: ' + e.message, 'error'); });
+    }
+    function renderBoatGrid(boats) {
+      var grid = document.getElementById('boat-grid');
+      if (!boats.length) { grid.innerHTML = '<div class="loading">No hay barcos registrados.</div>'; return; }
+      grid.innerHTML = boats.map(function(b) {
+        var heroHTML = b.hero
+          ? '<img src="' + getApiBase() + '/internal/admin/boats/' + b.slug + '/images/' + b.hero + '" alt="" loading="lazy">'
+          : '<div class="no-hero">Sin fotos</div>';
+        var visClass = b.visible !== false ? 'published' : 'draft';
+        var visLabel = b.visible !== false ? 'publicado' : 'borrador';
+        return '<div class="boat-card" onclick="openBoat(\'' + b.slug + '\')">' +
+          '<div class="boat-card-hero">' + heroHTML +
+          '<span class="boat-card-badge">' + b.image_count + ' fotos</span></div>' +
+          '<div class="boat-card-info">' +
+          '<div class="boat-card-name">' + escapeHtml(b.name) + ' <span class="badge-vis ' + visClass + '">' + visLabel + '</span></div>' +
+          '<div class="boat-card-meta"><span>' + b.slug + '</span>' + (b.price ? '<span>' + b.price.toLocaleString('es-ES') + ' &euro;</span>' : '') + '</div>' +
+          '</div></div>';
+      }).join('');
+    }
+
+    // --- Open boat (loads both data + gallery) ---
+    function openBoat(slug) {
+      currentSlug = slug;
+      showView_raw('edit');
+      switchTab('text');
+      document.querySelectorAll('.tab-btn').forEach(function(b,i) { b.classList.toggle('active', i === 0); });
+      document.getElementById('edit-gallery').innerHTML = '<div class="loading">Cargando...</div>';
+
+      // Load both data and gallery info in parallel
+      Promise.all([
+        apiFetch('/internal/admin/boats/' + slug + '/data'),
+        apiFetch('/internal/admin/boats/' + slug)
+      ]).then(function(results) {
+        currentBoatData = results[0];
+        var boatInfo = results[1];
+
+        // Header
+        document.getElementById('edit-boat-name').textContent = currentBoatData.name || slug;
+        document.getElementById('edit-boat-slug').textContent = slug;
+        document.getElementById('edit-boat-dir').textContent = boatInfo.directory;
+        document.getElementById('edit-boat-count').textContent = boatInfo.files.length + ' fotos';
+        updateVisBadge(currentBoatData.visible !== false);
+
+        // Fill text form
+        fillTextForm(currentBoatData);
+
+        // Gallery
+        originalFiles = boatInfo.files.slice();
+        currentFiles = boatInfo.files.slice();
+        renderEditGallery();
+        setUnsaved(false);
+        document.getElementById('save-gallery-btn').disabled = false;
+        document.getElementById('save-regen-btn').disabled = false;
+        document.getElementById('regen-output').className = 'regen-output';
+      }).catch(function(e) { showStatus('Error cargando barco: ' + e.message, 'error'); });
+    }
+
+    function updateVisBadge(visible) {
+      var badge = document.getElementById('edit-vis-badge');
+      badge.textContent = visible ? 'publicado' : 'borrador';
+      badge.className = 'badge-vis ' + (visible ? 'published' : 'draft');
+      var btn = document.getElementById('toggle-vis-btn');
+      if (visible) { btn.textContent = 'Ocultar'; btn.className = 'btn btn-danger btn-sm'; }
+      else { btn.textContent = 'Publicar'; btn.className = 'btn btn-success btn-sm'; }
+    }
+
+    // --- Text form ---
+    function fillTextForm(d) {
+      document.getElementById('f-name').value = d.name || '';
+      document.getElementById('f-brand').value = d.brand || '';
+      document.getElementById('f-type').value = d.type || 'motor';
+      document.getElementById('f-year').value = d.year || '';
+      document.getElementById('f-price').value = d.price || '';
+      document.getElementById('f-location').value = d.location || '';
+      document.getElementById('f-condition').value = d.condition || 'used';
+      document.getElementById('f-length').value = d.length || '';
+      document.getElementById('f-beam').value = d.beam || '';
+      document.getElementById('f-draft').value = d.draft || '';
+      document.getElementById('f-engines').value = d.engines || '';
+      document.getElementById('f-fuel').value = d.fuel || '';
+      document.getElementById('f-cabins').value = d.cabins || '';
+      document.getElementById('f-berths').value = d.berths || '';
+      document.getElementById('f-heads').value = d.heads || '';
+      document.getElementById('f-catalog-img').value = (d.images && d.images[0]) || '';
+      // Badges
+      var badges = d.badges || [];
+      document.getElementById('f-badge-stock').checked = badges.indexOf('stock') >= 0;
+      document.getElementById('f-badge-new').checked = badges.indexOf('new') >= 0;
+      document.getElementById('f-badge-price-drop').checked = badges.indexOf('price-drop') >= 0;
+      // Description
+      document.getElementById('f-desc-es').value = (d.description && d.description.es) || '';
+      document.getElementById('f-desc-en').value = (d.description && d.description.en) || '';
+      // Specs (key: value format)
+      document.getElementById('f-specs-es').value = specsToText((d.specs && d.specs.es) || {});
+      document.getElementById('f-specs-en').value = specsToText((d.specs && d.specs.en) || {});
+    }
+
+    function collectFormData() {
+      var badges = [];
+      if (document.getElementById('f-badge-stock').checked) badges.push('stock');
+      if (document.getElementById('f-badge-new').checked) badges.push('new');
+      if (document.getElementById('f-badge-price-drop').checked) badges.push('price-drop');
+      var imgVal = document.getElementById('f-catalog-img').value.trim();
+      return {
+        slug: currentSlug,
+        name: document.getElementById('f-name').value.trim(),
+        visible: currentBoatData ? currentBoatData.visible : false,
+        brand: document.getElementById('f-brand').value.trim(),
+        type: document.getElementById('f-type').value,
+        year: parseInt(document.getElementById('f-year').value) || 0,
+        price: parseInt(document.getElementById('f-price').value) || 0,
+        length: parseFloat(document.getElementById('f-length').value) || 0,
+        beam: parseFloat(document.getElementById('f-beam').value) || 0,
+        draft: parseFloat(document.getElementById('f-draft').value) || 0,
+        location: document.getElementById('f-location').value.trim(),
+        condition: document.getElementById('f-condition').value,
+        badges: badges,
+        engines: document.getElementById('f-engines').value.trim(),
+        fuel: document.getElementById('f-fuel').value.trim(),
+        cabins: parseInt(document.getElementById('f-cabins').value) || 0,
+        berths: parseInt(document.getElementById('f-berths').value) || 0,
+        heads: parseInt(document.getElementById('f-heads').value) || 0,
+        description: {
+          es: document.getElementById('f-desc-es').value,
+          en: document.getElementById('f-desc-en').value
+        },
+        specs: {
+          es: textToSpecs(document.getElementById('f-specs-es').value),
+          en: textToSpecs(document.getElementById('f-specs-en').value)
+        },
+        images: imgVal ? [imgVal] : []
+      };
+    }
+
+    function specsToText(obj) {
+      return Object.keys(obj).map(function(k) { return k + ': ' + obj[k]; }).join('\n');
+    }
+    function textToSpecs(text) {
+      var obj = {};
+      text.split('\n').forEach(function(line) {
+        var idx = line.indexOf(':');
+        if (idx > 0) { obj[line.substring(0, idx).trim()] = line.substring(idx + 1).trim(); }
+      });
+      return obj;
+    }
+
+    function saveBoatData() {
+      var data = collectFormData();
+      apiFetch('/internal/admin/boats/' + currentSlug + '/data', { method: 'PUT', body: data })
+        .then(function() {
+          currentBoatData = data;
+          showStatus('Borrador guardado. Usa "Guardar y publicar" para regenerar la web.', 'success');
+        })
+        .catch(function(e) { showStatus('Error: ' + e.message, 'error'); });
+    }
+
+    function saveAndBuild() {
+      var data = collectFormData();
+      showStatus('Guardando y regenerando...', 'info');
+      apiFetch('/internal/admin/boats/' + currentSlug + '/data', { method: 'PUT', body: data })
+        .then(function() {
+          currentBoatData = data;
+          return apiFetch('/internal/admin/build', { method: 'POST' });
+        })
+        .then(function(res) {
+          var output = document.getElementById('regen-output');
+          output.textContent = res.output; output.className = 'regen-output visible';
+          showStatus('Datos guardados y sitio regenerado.', 'success');
+        })
+        .catch(function(e) { showStatus('Error: ' + e.message, 'error'); });
+    }
+
+    function toggleVisibility() {
+      var newVis = !(currentBoatData && currentBoatData.visible !== false);
+      var label = newVis ? 'Publicando...' : 'Ocultando...';
+      showStatus(label, 'info');
+      apiFetch('/internal/admin/boats/' + currentSlug + '/visibility', { method: 'PATCH', body: { visible: newVis } })
+        .then(function(res) {
+          currentBoatData.visible = newVis;
+          updateVisBadge(newVis);
+          showStatus(res.message, 'success');
+        })
+        .catch(function(e) { showStatus('Error: ' + e.message, 'error'); });
+    }
+
+    // --- Gallery ---
+    function renderEditGallery() {
+      var gallery = document.getElementById('edit-gallery');
+      gallery.innerHTML = '';
+      if (currentFiles.length === 0) { gallery.innerHTML = '<div class="loading">Sin fotos. Coloca JPGs en la carpeta del barco.</div>'; return; }
+      currentFiles.forEach(function(filename, idx) {
+        var item = document.createElement('div');
+        item.className = 'gallery-item' + (idx === 0 ? ' hero-marker' : '');
+        item.setAttribute('data-file', filename);
+        var img = document.createElement('img');
+        img.src = getApiBase() + '/internal/admin/boats/' + currentSlug + '/images/' + filename;
+        img.alt = filename;
+        img.onerror = function() { var p = document.createElement('div'); p.className = 'img-error'; p.textContent = filename; this.parentNode.replaceChild(p, this); };
+        var label = document.createElement('div');
+        label.className = 'label';
+        label.textContent = idx === 0 ? 'HERO — ' + filename : filename;
+        item.appendChild(img); item.appendChild(label); gallery.appendChild(item);
+      });
+      if (sortableInstance) sortableInstance.destroy();
+      sortableInstance = Sortable.create(gallery, {
+        animation: 200, ghostClass: 'sortable-ghost', chosenClass: 'sortable-chosen',
+        onEnd: function() {
+          var items = gallery.querySelectorAll('.gallery-item');
+          currentFiles = Array.from(items).map(function(el) { return el.getAttribute('data-file'); });
+          items.forEach(function(el, idx) {
+            var lbl = el.querySelector('.label'), file = el.getAttribute('data-file');
+            if (idx === 0) { el.classList.add('hero-marker'); if (lbl) lbl.textContent = 'HERO — ' + file; }
+            else { el.classList.remove('hero-marker'); if (lbl) lbl.textContent = file; }
+          });
+          setUnsaved(!arraysEqual(currentFiles, originalFiles));
+        }
+      });
+    }
+
+    function saveGallery() {
+      document.getElementById('save-gallery-btn').disabled = true;
+      apiFetch('/internal/admin/boats/' + currentSlug + '/gallery', { method: 'PUT', body: { files: currentFiles } })
+        .then(function() { originalFiles = currentFiles.slice(); setUnsaved(false); showStatus('Orden guardado.', 'success'); document.getElementById('save-gallery-btn').disabled = false; })
+        .catch(function(e) { showStatus('Error: ' + e.message, 'error'); document.getElementById('save-gallery-btn').disabled = false; });
+    }
+    function saveGalleryAndBuild() {
+      document.getElementById('save-regen-btn').disabled = true;
+      showStatus('Guardando y regenerando...', 'info');
+      apiFetch('/internal/admin/boats/' + currentSlug + '/gallery', { method: 'PUT', body: { files: currentFiles } })
+        .then(function() { originalFiles = currentFiles.slice(); setUnsaved(false); return apiFetch('/internal/admin/build', { method: 'POST' }); })
+        .then(function(res) {
+          var output = document.getElementById('regen-output'); output.textContent = res.output; output.className = 'regen-output visible';
+          showStatus('Galería guardada y sitio regenerado.', 'success'); document.getElementById('save-regen-btn').disabled = false;
+        })
+        .catch(function(e) { showStatus('Error: ' + e.message, 'error'); document.getElementById('save-regen-btn').disabled = false; });
+    }
+    function resetGallery() { currentFiles = originalFiles.slice(); renderEditGallery(); setUnsaved(false); showStatus('Orden reseteado.', 'info'); }
+    function setUnsaved(changed) { document.getElementById('unsaved-indicator').className = 'unsaved-indicator' + (changed ? ' visible' : ''); }
+
+    // --- Create ---
+    function updateSlugPreview() {
+      var slug = document.getElementById('create-slug').value.trim();
+      var preview = document.getElementById('slug-preview');
+      if (slug) { preview.innerHTML = 'Se creará: <code>data/boats/' + escapeHtml(slug) + '.json</code> + <code>assets/boats/' + escapeHtml(slug) + '/</code>'; preview.style.display = 'block'; }
+      else preview.style.display = 'none';
+    }
+    function createBoat() {
+      var name = document.getElementById('create-name').value.trim();
+      var slug = document.getElementById('create-slug').value.trim();
+      if (!name) { showStatus('Introduce un nombre.', 'warning'); return; }
+      if (!slug) { showStatus('Introduce un slug.', 'warning'); return; }
+      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) { showStatus('Slug inválido.', 'error'); return; }
+      apiFetch('/internal/admin/boats', { method: 'POST', body: { slug: slug, name: name } })
+        .then(function(res) {
+          showStatus('Barco "' + name + '" creado como borrador.', 'success');
+          document.getElementById('next-step-dir').textContent = 'static/site/assets/boats/' + slug + '/';
+          document.getElementById('create-next-steps').style.display = 'block';
+        })
+        .catch(function(e) { showStatus('Error: ' + e.message, 'error'); });
+    }
+
+    // --- Helpers ---
+    function arraysEqual(a, b) { if (a.length !== b.length) return false; for (var i = 0; i < a.length; i++) { if (a[i] !== b[i]) return false; } return true; }
+    function escapeHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    window.addEventListener('beforeunload', function(e) {
+      if (document.getElementById('unsaved-indicator').classList.contains('visible')) { e.preventDefault(); e.returnValue = ''; }
+    });
+  </script>
+</body>
+</html>

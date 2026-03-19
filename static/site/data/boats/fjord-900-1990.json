@@ -1,0 +1,55 @@
+{
+  "slug": "fjord-900-1990",
+  "name": "Fjord 900",
+  "brand": "Fjord",
+  "type": "motor",
+  "year": 1990,
+  "price": 29500,
+  "length": 9.0,
+  "beam": 3.0,
+  "draft": 0.85,
+  "location": "El Masnou",
+  "condition": "used",
+  "badges": [
+    "stock"
+  ],
+  "engines": "1× Volvo 130 CV",
+  "fuel": "Diésel",
+  "cabins": 1,
+  "berths": 2,
+  "heads": 1,
+  "description": {
+    "es": "Fjord 900 noruego, diseño nórdico funcional y robusto. Una cabina, un baño, cockpit espacioso. Construcción sólida ideal para la navegación costera. La embarcación más accesible de nuestra cartera.",
+    "en": "Norwegian Fjord 900, functional and robust Nordic design. One cabin, one head, spacious cockpit. Solid construction ideal for coastal navigation. The most accessible vessel in our portfolio."
+  },
+  "specs": {
+    "es": {
+      "Eslora": "9,00 m",
+      "Manga": "3,00 m",
+      "Calado": "0,85 m",
+      "Motor": "1× Volvo 130 CV",
+      "Combustible": "Diésel",
+      "Cabinas": "1",
+      "Literas": "2",
+      "Baños": "1",
+      "Año": "1990",
+      "Puerto": "El Masnou"
+    },
+    "en": {
+      "Length": "9.00 m",
+      "Beam": "3.00 m",
+      "Draft": "0.85 m",
+      "Engine": "1× Volvo 130 HP",
+      "Fuel": "Diesel",
+      "Cabins": "1",
+      "Berths": "2",
+      "Heads": "1",
+      "Year": "1990",
+      "Port": "El Masnou"
+    }
+  },
+  "images": [
+    "fjord-900-1.jpg"
+  ],
+  "visible": true
+}

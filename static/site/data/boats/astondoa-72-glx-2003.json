@@ -1,0 +1,55 @@
+{
+  "slug": "astondoa-72-glx-2003",
+  "name": "Astondoa 72 GLX",
+  "brand": "Astondoa",
+  "type": "motor",
+  "year": 2003,
+  "price": 850000,
+  "length": 22.0,
+  "beam": 5.5,
+  "draft": 1.7,
+  "location": "Alicante",
+  "condition": "used",
+  "badges": [
+    "new"
+  ],
+  "engines": "2× MAN 1100 CV",
+  "fuel": "Diésel",
+  "cabins": 4,
+  "berths": 8,
+  "heads": 3,
+  "description": {
+    "es": "Astondoa 72 GLX con amplio flybridge y cuatro cabinas. Construcción sólida del astillero español de referencia. Mecánica revisada y lista para navegar. Amarre en Alicante.",
+    "en": "Astondoa 72 GLX with spacious flybridge and four cabins. Solid build from Spain's premier shipyard. Mechanically surveyed and ready to cruise. Berth in Alicante."
+  },
+  "specs": {
+    "es": {
+      "Eslora": "22,00 m",
+      "Manga": "5,50 m",
+      "Calado": "1,70 m",
+      "Motor": "2× MAN 1100 CV",
+      "Combustible": "Diésel",
+      "Cabinas": "4",
+      "Literas": "8",
+      "Baños": "3",
+      "Año": "2003",
+      "Puerto": "Alicante"
+    },
+    "en": {
+      "Length": "22.00 m",
+      "Beam": "5.50 m",
+      "Draft": "1.70 m",
+      "Engine": "2× MAN 1100 HP",
+      "Fuel": "Diesel",
+      "Cabins": "4",
+      "Berths": "8",
+      "Heads": "3",
+      "Year": "2003",
+      "Port": "Alicante"
+    }
+  },
+  "images": [
+    "astondoa-72-glx-1.jpg"
+  ],
+  "visible": true
+}

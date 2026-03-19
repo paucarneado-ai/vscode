@@ -1,0 +1,1802 @@
+{
+  "generated_at": "2026-03-19T03:25:32.564488+00:00",
+  "version": 2,
+  "seed_maps_used": {
+    "audit": "docs/openclaw_built_state_audit.md",
+    "master_plan": "docs/openclaw_master_plan.md",
+    "previous_map": "reports/project_map.json"
+  },
+  "html_pages": [
+    {
+      "type": "html_page",
+      "file": "static/site/index.html",
+      "public_url": "/",
+      "title": "Sentyacht — Compraventa profesional de embarcaciones | Puerto Deportivo del Masnou",
+      "generated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "html_page",
+      "file": "static/site/vender/index.html",
+      "public_url": "/vender/",
+      "title": "Sentyacht — Venta profesional de embarcaciones",
+      "generated": false,
+      "provenance": "detected_from_code"
+    }
+  ],
+  "api_routes": [
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/internal/admin/",
+      "auth_required": false,
+      "source_file": "apps/api/routes/admin.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/internal/admin/boats",
+      "auth_required": true,
+      "source_file": "apps/api/routes/admin.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/internal/admin/boats/{slug}",
+      "auth_required": true,
+      "source_file": "apps/api/routes/admin.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/internal/admin/boats/{slug}/data",
+      "auth_required": true,
+      "source_file": "apps/api/routes/admin.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "PUT",
+      "path": "/internal/admin/boats/{slug}/data",
+      "auth_required": true,
+      "source_file": "apps/api/routes/admin.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "PATCH",
+      "path": "/internal/admin/boats/{slug}/visibility",
+      "auth_required": true,
+      "source_file": "apps/api/routes/admin.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "PUT",
+      "path": "/internal/admin/boats/{slug}/gallery",
+      "auth_required": true,
+      "source_file": "apps/api/routes/admin.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "POST",
+      "path": "/internal/admin/boats",
+      "auth_required": true,
+      "source_file": "apps/api/routes/admin.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "POST",
+      "path": "/internal/admin/build",
+      "auth_required": true,
+      "source_file": "apps/api/routes/admin.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "POST",
+      "path": "/internal/admin/regenerate",
+      "auth_required": true,
+      "source_file": "apps/api/routes/admin.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/internal/admin/boats/{slug}/images/{filename}",
+      "auth_required": true,
+      "source_file": "apps/api/routes/admin.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/demo/intake",
+      "auth_required": true,
+      "source_file": "apps/api/routes/demo.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/health",
+      "auth_required": true,
+      "source_file": "apps/api/routes/health.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/routes",
+      "auth_required": true,
+      "source_file": "apps/api/routes/health.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/health/detail",
+      "auth_required": true,
+      "source_file": "apps/api/routes/health.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/internal/queue",
+      "auth_required": true,
+      "source_file": "apps/api/routes/internal.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "POST",
+      "path": "/internal/dispatch/claim",
+      "auth_required": true,
+      "source_file": "apps/api/routes/internal.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "DELETE",
+      "path": "/internal/dispatch/claim/{lead_id}",
+      "auth_required": true,
+      "source_file": "apps/api/routes/internal.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/internal/dispatch",
+      "auth_required": true,
+      "source_file": "apps/api/routes/internal.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/internal/handoffs",
+      "auth_required": true,
+      "source_file": "apps/api/routes/internal.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/internal/handoffs/export.csv",
+      "auth_required": true,
+      "source_file": "apps/api/routes/internal.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/internal/review",
+      "auth_required": true,
+      "source_file": "apps/api/routes/internal.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "POST",
+      "path": "/internal/review/{lead_id}/claim",
+      "auth_required": true,
+      "source_file": "apps/api/routes/internal.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/internal/ops/snapshot",
+      "auth_required": true,
+      "source_file": "apps/api/routes/internal.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/internal/client-ready",
+      "auth_required": true,
+      "source_file": "apps/api/routes/internal.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/internal/worklist",
+      "auth_required": true,
+      "source_file": "apps/api/routes/internal.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/internal/source-performance",
+      "auth_required": true,
+      "source_file": "apps/api/routes/internal.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/internal/source-actions",
+      "auth_required": true,
+      "source_file": "apps/api/routes/internal.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/internal/events",
+      "auth_required": true,
+      "source_file": "apps/api/routes/internal.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/internal/sentinel",
+      "auth_required": true,
+      "source_file": "apps/api/routes/internal.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/internal/audit",
+      "auth_required": true,
+      "source_file": "apps/api/routes/internal.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/internal/redundancy",
+      "auth_required": true,
+      "source_file": "apps/api/routes/internal.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "POST",
+      "path": "/internal/scope-critic",
+      "auth_required": true,
+      "source_file": "apps/api/routes/internal.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "POST",
+      "path": "/internal/proof-verifier",
+      "auth_required": true,
+      "source_file": "apps/api/routes/internal.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "POST",
+      "path": "/internal/drift-detector",
+      "auth_required": true,
+      "source_file": "apps/api/routes/internal.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "POST",
+      "path": "/internal/outcomes",
+      "auth_required": true,
+      "source_file": "apps/api/routes/internal.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/internal/outcomes/summary",
+      "auth_required": true,
+      "source_file": "apps/api/routes/internal.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/internal/outcomes/by-source",
+      "auth_required": true,
+      "source_file": "apps/api/routes/internal.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/internal/followup-queue",
+      "auth_required": true,
+      "source_file": "apps/api/routes/internal.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/internal/source-outcome-actions",
+      "auth_required": true,
+      "source_file": "apps/api/routes/internal.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/internal/daily-actions",
+      "auth_required": true,
+      "source_file": "apps/api/routes/internal.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/internal/followup-handoffs",
+      "auth_required": true,
+      "source_file": "apps/api/routes/internal.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/internal/followup-automation",
+      "auth_required": true,
+      "source_file": "apps/api/routes/internal.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/internal/followup-automation/export.csv",
+      "auth_required": true,
+      "source_file": "apps/api/routes/internal.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/internal/source-intelligence",
+      "auth_required": true,
+      "source_file": "apps/api/routes/internal.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "POST",
+      "path": "/leads",
+      "auth_required": true,
+      "source_file": "apps/api/routes/leads.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "POST",
+      "path": "/leads/ingest",
+      "auth_required": true,
+      "source_file": "apps/api/routes/leads.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "POST",
+      "path": "/leads/webhook/{provider}",
+      "auth_required": true,
+      "source_file": "apps/api/routes/leads.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "POST",
+      "path": "/leads/webhook/{provider}/batch",
+      "auth_required": true,
+      "source_file": "apps/api/routes/leads.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "POST",
+      "path": "/leads/external",
+      "auth_required": true,
+      "source_file": "apps/api/routes/leads.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/leads",
+      "auth_required": true,
+      "source_file": "apps/api/routes/leads.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/leads/sources",
+      "auth_required": true,
+      "source_file": "apps/api/routes/leads.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/leads/summary",
+      "auth_required": true,
+      "source_file": "apps/api/routes/leads.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/leads/actionable",
+      "auth_required": true,
+      "source_file": "apps/api/routes/leads.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/leads/actionable/worklist",
+      "auth_required": true,
+      "source_file": "apps/api/routes/leads.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/leads/export.csv",
+      "auth_required": true,
+      "source_file": "apps/api/routes/leads.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/leads/{lead_id}",
+      "auth_required": true,
+      "source_file": "apps/api/routes/leads.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/leads/{lead_id}/pack",
+      "auth_required": true,
+      "source_file": "apps/api/routes/leads.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/leads/{lead_id}/pack/html",
+      "auth_required": true,
+      "source_file": "apps/api/routes/leads.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/leads/{lead_id}/pack.txt",
+      "auth_required": true,
+      "source_file": "apps/api/routes/leads.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/leads/{lead_id}/operational",
+      "auth_required": true,
+      "source_file": "apps/api/routes/leads.py",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "api_route",
+      "method": "GET",
+      "path": "/leads/{lead_id}/delivery",
+      "auth_required": true,
+      "source_file": "apps/api/routes/leads.py",
+      "provenance": "detected_from_code"
+    }
+  ],
+  "python_packages": [
+    {
+      "type": "python_module",
+      "file": "apps/api/auth.py",
+      "functions": 1,
+      "classes": 0,
+      "lines": 64,
+      "internal_imports": [
+        "apps.api.auth",
+        "apps.api.config"
+      ],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/api/config.py",
+      "functions": 0,
+      "classes": 1,
+      "lines": 17,
+      "internal_imports": [],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/api/db.py",
+      "functions": 3,
+      "classes": 0,
+      "lines": 80,
+      "internal_imports": [],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/api/events.py",
+      "functions": 1,
+      "classes": 0,
+      "lines": 38,
+      "internal_imports": [
+        "apps.api.db"
+      ],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/api/main.py",
+      "functions": 0,
+      "classes": 0,
+      "lines": 28,
+      "internal_imports": [
+        "apps.api.config",
+        "apps.api.db",
+        "apps.api.routes.demo",
+        "apps.api.routes.health",
+        "apps.api.routes.internal",
+        "apps.api.routes.leads"
+      ],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/api/ratelimit.py",
+      "functions": 4,
+      "classes": 1,
+      "lines": 118,
+      "internal_imports": [
+        "apps.api.config"
+      ],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/api/schemas.py",
+      "functions": 0,
+      "classes": 75,
+      "lines": 634,
+      "internal_imports": [],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/api/automations/followup_bridge.py",
+      "functions": 2,
+      "classes": 2,
+      "lines": 121,
+      "internal_imports": [],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/api/routes/admin.py",
+      "functions": 11,
+      "classes": 3,
+      "lines": 143,
+      "internal_imports": [
+        "apps.api.auth",
+        "apps.api.services"
+      ],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/api/routes/demo.py",
+      "functions": 1,
+      "classes": 0,
+      "lines": 92,
+      "internal_imports": [],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/api/routes/health.py",
+      "functions": 3,
+      "classes": 0,
+      "lines": 66,
+      "internal_imports": [
+        "apps.api.config",
+        "apps.api.db"
+      ],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/api/routes/internal.py",
+      "functions": 76,
+      "classes": 0,
+      "lines": 2210,
+      "internal_imports": [
+        "apps.api.db",
+        "apps.api.events",
+        "apps.api.routes.leads",
+        "apps.api.schemas",
+        "apps.api.services.actions",
+        "apps.api.services.leadpack"
+      ],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/api/routes/leads.py",
+      "functions": 24,
+      "classes": 0,
+      "lines": 580,
+      "internal_imports": [
+        "apps.api.db",
+        "apps.api.events",
+        "apps.api.schemas",
+        "apps.api.services.actions",
+        "apps.api.services.leadpack",
+        "apps.api.services.scoring"
+      ],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/api/services/actions.py",
+      "functions": 4,
+      "classes": 0,
+      "lines": 69,
+      "internal_imports": [],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/api/services/admin.py",
+      "functions": 12,
+      "classes": 0,
+      "lines": 303,
+      "internal_imports": [],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/api/services/intake.py",
+      "functions": 10,
+      "classes": 3,
+      "lines": 248,
+      "internal_imports": [
+        "apps.api.db",
+        "apps.api.schemas",
+        "apps.api.services.scoring"
+      ],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/api/services/leadpack.py",
+      "functions": 4,
+      "classes": 0,
+      "lines": 55,
+      "internal_imports": [
+        "apps.api.schemas"
+      ],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/api/services/operational.py",
+      "functions": 6,
+      "classes": 0,
+      "lines": 131,
+      "internal_imports": [
+        "apps.api.db",
+        "apps.api.schemas",
+        "apps.api.services.actions",
+        "apps.api.services.leadpack"
+      ],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/api/services/scoring.py",
+      "functions": 3,
+      "classes": 0,
+      "lines": 115,
+      "internal_imports": [],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/pathway_discovery/analyzer.py",
+      "functions": 4,
+      "classes": 1,
+      "lines": 159,
+      "internal_imports": [
+        "apps.api.services.scoring",
+        "apps.pathway_discovery.schemas",
+        "apps.pathway_discovery.utils"
+      ],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/pathway_discovery/heuristics.py",
+      "functions": 10,
+      "classes": 0,
+      "lines": 395,
+      "internal_imports": [
+        "apps.pathway_discovery.schemas"
+      ],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/pathway_discovery/registry.py",
+      "functions": 6,
+      "classes": 0,
+      "lines": 164,
+      "internal_imports": [
+        "apps.pathway_discovery.schemas",
+        "apps.pathway_discovery.utils"
+      ],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/pathway_discovery/reporter.py",
+      "functions": 14,
+      "classes": 0,
+      "lines": 580,
+      "internal_imports": [
+        "apps.pathway_discovery.analyzer",
+        "apps.pathway_discovery.heuristics",
+        "apps.pathway_discovery.registry",
+        "apps.pathway_discovery.schemas",
+        "apps.pathway_discovery.scorer"
+      ],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/pathway_discovery/review_cli.py",
+      "functions": 9,
+      "classes": 0,
+      "lines": 211,
+      "internal_imports": [],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/pathway_discovery/schemas.py",
+      "functions": 0,
+      "classes": 8,
+      "lines": 135,
+      "internal_imports": [],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/pathway_discovery/scorer.py",
+      "functions": 11,
+      "classes": 0,
+      "lines": 346,
+      "internal_imports": [
+        "apps.pathway_discovery.schemas"
+      ],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/pathway_discovery/utils.py",
+      "functions": 1,
+      "classes": 0,
+      "lines": 15,
+      "internal_imports": [],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/pathway_discovery/tests/test_analyzer.py",
+      "functions": 6,
+      "classes": 0,
+      "lines": 55,
+      "internal_imports": [
+        "apps.pathway_discovery.analyzer"
+      ],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/pathway_discovery/tests/test_heuristics.py",
+      "functions": 12,
+      "classes": 0,
+      "lines": 157,
+      "internal_imports": [
+        "apps.pathway_discovery.analyzer",
+        "apps.pathway_discovery.heuristics",
+        "apps.pathway_discovery.registry",
+        "apps.pathway_discovery.schemas"
+      ],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/pathway_discovery/tests/test_intermediate_role.py",
+      "functions": 12,
+      "classes": 0,
+      "lines": 195,
+      "internal_imports": [
+        "apps.pathway_discovery.analyzer",
+        "apps.pathway_discovery.heuristics",
+        "apps.pathway_discovery.registry",
+        "apps.pathway_discovery.reporter",
+        "apps.pathway_discovery.schemas",
+        "apps.pathway_discovery.scorer"
+      ],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/pathway_discovery/tests/test_registry.py",
+      "functions": 7,
+      "classes": 0,
+      "lines": 68,
+      "internal_imports": [
+        "apps.pathway_discovery.registry"
+      ],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/pathway_discovery/tests/test_reporter.py",
+      "functions": 28,
+      "classes": 0,
+      "lines": 170,
+      "internal_imports": [
+        "apps.pathway_discovery.reporter",
+        "apps.pathway_discovery.schemas"
+      ],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/pathway_discovery/tests/test_review_cli.py",
+      "functions": 18,
+      "classes": 0,
+      "lines": 226,
+      "internal_imports": [
+        "apps.pathway_discovery.reporter",
+        "apps.pathway_discovery.review_cli",
+        "apps.pathway_discovery.schemas"
+      ],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/pathway_discovery/tests/test_review_lifecycle.py",
+      "functions": 14,
+      "classes": 0,
+      "lines": 187,
+      "internal_imports": [
+        "apps.pathway_discovery.reporter",
+        "apps.pathway_discovery.schemas",
+        "apps.pathway_discovery.scorer"
+      ],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "python_module",
+      "file": "apps/pathway_discovery/tests/test_scorer.py",
+      "functions": 28,
+      "classes": 0,
+      "lines": 174,
+      "internal_imports": [
+        "apps.pathway_discovery.schemas",
+        "apps.pathway_discovery.scorer"
+      ],
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    }
+  ],
+  "scripts": [
+    {
+      "type": "script",
+      "file": "scripts/build_site.py",
+      "purpose": "Build static site from boat JSON data files.",
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "script",
+      "file": "scripts/cartographer.py",
+      "purpose": "cartographer.py",
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "script",
+      "file": "scripts/generate_map.py",
+      "purpose": "Codebase map generator for OpenClaw.",
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "script",
+      "file": "scripts/migrate_boats_to_json.py",
+      "purpose": "One-time migration: extract boat data from boats.js into per-boat JSON files.",
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "script",
+      "file": "deploy/deploy-staging.sh",
+      "purpose": "deploy-staging.sh — Sync, configure, and validate OpenClaw + Sentyacht staging",
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "script",
+      "file": "deploy/setup-vps.sh",
+      "purpose": "setup-vps.sh — First-time VPS setup for OpenClaw + Sentyacht staging",
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "script",
+      "file": "deploy/ops/backup-sqlite.sh",
+      "purpose": "backup-sqlite.sh — Create a timestamped backup of the leads database",
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "script",
+      "file": "deploy/ops/check-staging.sh",
+      "purpose": "check-staging.sh — Operational health check",
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "script",
+      "file": "deploy/ops/restart-services.sh",
+      "purpose": "restart-services.sh — Restart OpenClaw API and Caddy",
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "script",
+      "file": "deploy/ops/restore-sqlite.sh",
+      "purpose": "restore-sqlite.sh — Restore leads database from a backup file",
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "script",
+      "file": "deploy/ops/smoke-intake.sh",
+      "purpose": "smoke-intake.sh — Quick operational smoke test for lead ingestion",
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "script",
+      "file": "deploy/ops/verify-backup.sh",
+      "purpose": "verify-backup.sh — Validate that a backup is actually recoverable",
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    }
+  ],
+  "docs": [
+    {
+      "type": "doc",
+      "file": "docs/00_project_context_master.md",
+      "title": "OpenClaw — Contexto Maestro para Claude Code",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "doc",
+      "file": "docs/CLAUDE.md",
+      "title": "docs/CLAUDE.md",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "doc",
+      "file": "docs/component_index.md",
+      "title": "Component Index",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "doc",
+      "file": "docs/execution_protocol.md",
+      "title": "Execution Protocol",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "doc",
+      "file": "docs/external_trial_runbook.md",
+      "title": "External Lead Trial — Operator Runbook",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "doc",
+      "file": "docs/followup_csv_runbook.md",
+      "title": "Followup CSV Export — Operator Runbook",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "doc",
+      "file": "docs/gallery_runbook.md",
+      "title": "Runbook: Gestión de barcos y galerías",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "doc",
+      "file": "docs/leads_decision_log.md",
+      "title": "Leads Module — Decision Log",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "doc",
+      "file": "docs/leads_runbook.md",
+      "title": "Leads Module — Runbook Operativo",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "doc",
+      "file": "docs/maintenance_register.md",
+      "title": "Maintenance Register",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "doc",
+      "file": "docs/openclaw_built_state_audit.md",
+      "title": "OpenClaw — Built State Audit",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "doc",
+      "file": "docs/openclaw_master_plan.md",
+      "title": "OpenClaw — Master Plan",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "doc",
+      "file": "docs/operational_contracts.md",
+      "title": "OpenClaw — Operational Contracts & Technical State",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "doc",
+      "file": "docs/project_map.md",
+      "title": "Project Map",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "doc",
+      "file": "docs/repair_packet_templates.md",
+      "title": "Repair Packet Templates",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "doc",
+      "file": "docs/system_map.md",
+      "title": "System Map",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "doc",
+      "file": "docs/triad_review_backlog.md",
+      "title": "Triad Review Backlog",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "doc",
+      "file": "docs/work_templates.md",
+      "title": "Work Templates",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "doc",
+      "file": "docs/acquisition/acquisition_mvp.md",
+      "title": "Captación MVP — Arquitectura y Decisiones",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "doc",
+      "file": "docs/acquisition/brief_barcos_venta.md",
+      "title": "Brief de Captación — Vendedor de Barco de Ocasión",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "doc",
+      "file": "docs/acquisition/circuito_vendedor_sentyacht.md",
+      "title": "Circuito de captación — Vendedor de embarcación (Sentyacht)",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "doc",
+      "file": "docs/acquisition/trial_launch_prep.md",
+      "title": "Acquisition Trial Launch Prep",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "doc",
+      "file": "docs/deploy/sentyacht_go_live_checklist.md",
+      "title": "Go-live checklist — Sentyacht",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "doc",
+      "file": "docs/deploy/sentyacht_hostinger_plan.md",
+      "title": "Plan de despliegue — Sentyacht en Hostinger VPS",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "doc",
+      "file": "docs/deploy/sentyacht_hostinger_staging_runbook.md",
+      "title": "Staging runbook — Sentyacht en Hostinger VPS",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "doc",
+      "file": "docs/deploy/sentyacht_staging_checklist.md",
+      "title": "Staging checklist — Sentyacht en Hostinger VPS",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "doc",
+      "file": "docs/deploy/sentyacht_staging_ops.md",
+      "title": "Staging operations — Sentyacht en Hostinger VPS",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "doc",
+      "file": "docs/integration/n8n_interface.md",
+      "title": "Interfaz oficial OpenClaw -> n8n",
+      "provenance": "detected_from_code"
+    }
+  ],
+  "tools": [
+    {
+      "type": "tool",
+      "file": "tools/admin.html",
+      "deprecated": false,
+      "provenance": "detected_from_code"
+    }
+  ],
+  "data_files": [
+    {
+      "type": "boat_data",
+      "file": "static/site/data/boats/astondoa-39-2002.json",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "boat_data",
+      "file": "static/site/data/boats/astondoa-53-glx-1993.json",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "boat_data",
+      "file": "static/site/data/boats/astondoa-72-glx-2003.json",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "boat_data",
+      "file": "static/site/data/boats/astondoa-82-glx-2008.json",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "boat_data",
+      "file": "static/site/data/boats/finnyacht-35-1972.json",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "boat_data",
+      "file": "static/site/data/boats/fjord-900-1990.json",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "boat_data",
+      "file": "static/site/data/boats/grand-banks-38-eastbay-ex-2002.json",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "boat_data",
+      "file": "static/site/data/boats/hanse-470-2007.json",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "boat_data",
+      "file": "static/site/data/boats/ketch-nordic-36-classic-1981.json",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "boat_data",
+      "file": "static/site/data/boats/navalia-60-2006.json",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "boat_data",
+      "file": "static/site/data/boats/rodman-900-flybridge-1996.json",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "boat_data",
+      "file": "static/site/data/boats/sunseeker-manhattan-50-2004.json",
+      "provenance": "detected_from_code"
+    }
+  ],
+  "static_assets": [],
+  "tests": [
+    {
+      "type": "test_file",
+      "file": "tests/test_cartographer.py",
+      "test_count": 28,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "test_file",
+      "file": "tests/api/test_api.py",
+      "test_count": 483,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "test_file",
+      "file": "tests/api/test_auth.py",
+      "test_count": 0,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "test_file",
+      "file": "tests/api/test_intake_normalization.py",
+      "test_count": 0,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "test_file",
+      "file": "tests/api/test_lead_status.py",
+      "test_count": 23,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "test_file",
+      "file": "tests/api/test_ratelimit.py",
+      "test_count": 0,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "test_file",
+      "file": "tests/automations/test_followup_bridge.py",
+      "test_count": 12,
+      "provenance": "detected_from_code"
+    }
+  ],
+  "pathway_tests": [
+    {
+      "type": "test_file",
+      "file": "apps/pathway_discovery/tests/test_analyzer.py",
+      "test_count": 6,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "test_file",
+      "file": "apps/pathway_discovery/tests/test_heuristics.py",
+      "test_count": 12,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "test_file",
+      "file": "apps/pathway_discovery/tests/test_intermediate_role.py",
+      "test_count": 11,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "test_file",
+      "file": "apps/pathway_discovery/tests/test_registry.py",
+      "test_count": 7,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "test_file",
+      "file": "apps/pathway_discovery/tests/test_reporter.py",
+      "test_count": 26,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "test_file",
+      "file": "apps/pathway_discovery/tests/test_review_cli.py",
+      "test_count": 16,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "test_file",
+      "file": "apps/pathway_discovery/tests/test_review_lifecycle.py",
+      "test_count": 12,
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "test_file",
+      "file": "apps/pathway_discovery/tests/test_scorer.py",
+      "test_count": 25,
+      "provenance": "detected_from_code"
+    }
+  ],
+  "configs": [
+    {
+      "type": "config",
+      "file": "Dockerfile",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "config",
+      "file": "docker-compose.yml",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "config",
+      "file": "requirements.txt",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "config",
+      "file": ".gitignore",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "config",
+      "file": ".env.example",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "config",
+      "file": ".claude/CLAUDE.md",
+      "provenance": "detected_from_code"
+    },
+    {
+      "type": "config",
+      "file": "deploy/Caddyfile.sentyacht",
+      "provenance": "detected_from_code"
+    }
+  ],
+  "reconciled_modules": [
+    {
+      "module": "Lead Engine",
+      "audit_status": "DONE",
+      "plan_phase": "MVP",
+      "files_in_audit": [
+        "apps/api/services/intake.py",
+        "scoring.py",
+        "actions.py",
+        "leadpack.py",
+        "operational.py"
+      ],
+      "files_confirmed_in_code": [
+        "apps/api/services/intake.py",
+        "scoring.py ->apps/api/services/scoring.py",
+        "actions.py ->apps/api/services/actions.py",
+        "leadpack.py ->apps/api/services/leadpack.py",
+        "operational.py ->apps/api/services/operational.py"
+      ],
+      "files_missing_from_code": [],
+      "provenance": "inherited_from_seed_map",
+      "validation": "confirmed"
+    },
+    {
+      "module": "API Routes",
+      "audit_status": "DONE",
+      "plan_phase": null,
+      "files_in_audit": [
+        "apps/api/main.py",
+        "apps/api/routes/leads.py",
+        "health.py",
+        "internal.py",
+        "admin.py"
+      ],
+      "files_confirmed_in_code": [
+        "apps/api/main.py",
+        "apps/api/routes/leads.py",
+        "health.py ->apps/api/routes/health.py",
+        "internal.py ->apps/api/routes/internal.py",
+        "admin.py ->(ambiguous: 2 matches)"
+      ],
+      "files_missing_from_code": [],
+      "provenance": "inherited_from_seed_map",
+      "validation": "confirmed"
+    },
+    {
+      "module": "Auth & Rate Limiting",
+      "audit_status": "DONE",
+      "plan_phase": "MVP",
+      "files_in_audit": [
+        "apps/api/auth.py",
+        "ratelimit.py"
+      ],
+      "files_confirmed_in_code": [
+        "apps/api/auth.py",
+        "ratelimit.py ->apps/api/ratelimit.py"
+      ],
+      "files_missing_from_code": [],
+      "provenance": "inherited_from_seed_map",
+      "validation": "confirmed"
+    },
+    {
+      "module": "Database",
+      "audit_status": "DONE",
+      "plan_phase": null,
+      "files_in_audit": [
+        "apps/api/db.py"
+      ],
+      "files_confirmed_in_code": [
+        "apps/api/db.py"
+      ],
+      "files_missing_from_code": [],
+      "provenance": "inherited_from_seed_map",
+      "validation": "confirmed"
+    },
+    {
+      "module": "Catálogo público SentYacht",
+      "audit_status": "DONE",
+      "plan_phase": "MVP",
+      "files_in_audit": [
+        "config.js",
+        "shared.js"
+      ],
+      "files_confirmed_in_code": [],
+      "files_missing_from_code": [
+        "config.js",
+        "shared.js"
+      ],
+      "provenance": "inherited_from_seed_map",
+      "validation": "needs_validation"
+    },
+    {
+      "module": "Admin Panel de barcos",
+      "audit_status": "DONE",
+      "plan_phase": null,
+      "files_in_audit": [
+        "tools/admin.html",
+        "apps/api/routes/admin.py",
+        "apps/api/services/admin.py"
+      ],
+      "files_confirmed_in_code": [
+        "tools/admin.html",
+        "apps/api/routes/admin.py",
+        "apps/api/services/admin.py"
+      ],
+      "files_missing_from_code": [],
+      "provenance": "inherited_from_seed_map",
+      "validation": "confirmed"
+    },
+    {
+      "module": "Build Pipeline",
+      "audit_status": "DONE",
+      "plan_phase": "MVP",
+      "files_in_audit": [
+        "scripts/build_site.py"
+      ],
+      "files_confirmed_in_code": [
+        "scripts/build_site.py"
+      ],
+      "files_missing_from_code": [],
+      "provenance": "inherited_from_seed_map",
+      "validation": "confirmed"
+    },
+    {
+      "module": "Deploy & Ops",
+      "audit_status": "MOSTLY_DONE",
+      "plan_phase": null,
+      "files_in_audit": [],
+      "files_confirmed_in_code": [],
+      "files_missing_from_code": [],
+      "provenance": "inherited_from_seed_map",
+      "validation": "no_files_to_check"
+    },
+    {
+      "module": "n8n / Meta Ads Integration",
+      "audit_status": "PARTIAL",
+      "plan_phase": null,
+      "files_in_audit": [
+        "docs/integration/n8n_interface.md",
+        "docs/briefs/meta_n8n.md"
+      ],
+      "files_confirmed_in_code": [
+        "docs/integration/n8n_interface.md"
+      ],
+      "files_missing_from_code": [
+        "docs/briefs/meta_n8n.md"
+      ],
+      "provenance": "inherited_from_seed_map",
+      "validation": "needs_validation"
+    },
+    {
+      "module": "Landing de captación vendedores",
+      "audit_status": "DONE",
+      "plan_phase": "MVP (DONE)",
+      "files_in_audit": [
+        "static/site/es/vender-mi-barco/index.html",
+        "static/site/es/vender-mi-barco/index.html"
+      ],
+      "files_confirmed_in_code": [
+        "static/site/es/vender-mi-barco/index.html ->(ambiguous: 2 matches)",
+        "static/site/es/vender-mi-barco/index.html ->(ambiguous: 2 matches)"
+      ],
+      "files_missing_from_code": [],
+      "provenance": "inherited_from_seed_map",
+      "validation": "confirmed"
+    },
+    {
+      "module": "Pathway Discovery",
+      "audit_status": "DONE",
+      "plan_phase": "Infraestructura",
+      "files_in_audit": [],
+      "files_confirmed_in_code": [],
+      "files_missing_from_code": [],
+      "provenance": "inherited_from_seed_map",
+      "validation": "no_files_to_check"
+    },
+    {
+      "module": "Schemas & Contracts",
+      "audit_status": "DONE",
+      "plan_phase": null,
+      "files_in_audit": [
+        "apps/api/schemas.py"
+      ],
+      "files_confirmed_in_code": [
+        "apps/api/schemas.py"
+      ],
+      "files_missing_from_code": [],
+      "provenance": "inherited_from_seed_map",
+      "validation": "confirmed"
+    },
+    {
+      "module": "Documentación",
+      "audit_status": "MOSTLY_DONE",
+      "plan_phase": null,
+      "files_in_audit": [],
+      "files_confirmed_in_code": [],
+      "files_missing_from_code": [],
+      "provenance": "inherited_from_seed_map",
+      "validation": "no_files_to_check"
+    },
+    {
+      "module": "integrate_galleries.py",
+      "audit_status": "DEPRECATED",
+      "plan_phase": null,
+      "files_in_audit": [
+        "scripts/integrate_galleries.py",
+        "scripts/integrate_galleries.py"
+      ],
+      "files_confirmed_in_code": [],
+      "files_missing_from_code": [
+        "scripts/integrate_galleries.py",
+        "scripts/integrate_galleries.py"
+      ],
+      "provenance": "inherited_from_seed_map",
+      "validation": "needs_validation"
+    },
+    {
+      "module": "gallery-reorder.html",
+      "audit_status": "DEPRECATED",
+      "plan_phase": null,
+      "files_in_audit": [
+        "tools/gallery-reorder.html",
+        "tools/gallery-reorder.html"
+      ],
+      "files_confirmed_in_code": [],
+      "files_missing_from_code": [
+        "tools/gallery-reorder.html",
+        "tools/gallery-reorder.html"
+      ],
+      "provenance": "inherited_from_seed_map",
+      "validation": "needs_validation"
+    },
+    {
+      "module": "Scraping scripts",
+      "audit_status": "DONE",
+      "plan_phase": null,
+      "files_in_audit": [
+        "scripts/scrape_galleries.py",
+        "scrape_all_galleries.py",
+        "scrape_test_one.py"
+      ],
+      "files_confirmed_in_code": [],
+      "files_missing_from_code": [
+        "scripts/scrape_galleries.py",
+        "scrape_all_galleries.py",
+        "scrape_test_one.py"
+      ],
+      "provenance": "inherited_from_seed_map",
+      "validation": "needs_validation"
+    },
+    {
+      "module": "Notificaciones",
+      "audit_status": "PLANNED",
+      "plan_phase": "Siguiente",
+      "files_in_audit": [],
+      "files_confirmed_in_code": [],
+      "files_missing_from_code": [],
+      "provenance": "inherited_from_seed_map",
+      "validation": "no_files_to_check"
+    },
+    {
+      "module": "Dashboard / Métricas",
+      "audit_status": "PLANNED",
+      "plan_phase": null,
+      "files_in_audit": [],
+      "files_confirmed_in_code": [],
+      "files_missing_from_code": [],
+      "provenance": "inherited_from_seed_map",
+      "validation": "no_files_to_check"
+    },
+    {
+      "module": "Market Data Layer",
+      "audit_status": "PLANNED",
+      "plan_phase": null,
+      "files_in_audit": [],
+      "files_confirmed_in_code": [],
+      "files_missing_from_code": [],
+      "provenance": "inherited_from_seed_map",
+      "validation": "no_files_to_check"
+    },
+    {
+      "module": "Formspree",
+      "audit_status": "SCAFFOLD",
+      "plan_phase": null,
+      "files_in_audit": [],
+      "files_confirmed_in_code": [],
+      "files_missing_from_code": [],
+      "provenance": "inherited_from_seed_map",
+      "validation": "no_files_to_check"
+    },
+    {
+      "module": "Operational Layer",
+      "audit_status": null,
+      "plan_phase": "MVP",
+      "plan_description": "Cola priorizada, worklist, lead pack, delivery",
+      "files_in_audit": [],
+      "files_confirmed_in_code": [],
+      "files_missing_from_code": [],
+      "provenance": "inherited_from_seed_map",
+      "validation": "needs_validation"
+    },
+    {
+      "module": "Automation Interface",
+      "audit_status": null,
+      "plan_phase": "MVP",
+      "plan_description": "Endpoints para n8n/Zapier (queue polling, webhook intake)",
+      "files_in_audit": [],
+      "files_confirmed_in_code": [],
+      "files_missing_from_code": [],
+      "provenance": "inherited_from_seed_map",
+      "validation": "needs_validation"
+    },
+    {
+      "module": "Admin de barcos",
+      "audit_status": null,
+      "plan_phase": "MVP",
+      "plan_description": "Panel interno para gestionar barcos, galerías, texto",
+      "files_in_audit": [],
+      "files_confirmed_in_code": [],
+      "files_missing_from_code": [],
+      "provenance": "inherited_from_seed_map",
+      "validation": "needs_validation"
+    },
+    {
+      "module": "Landing de compra",
+      "audit_status": null,
+      "plan_phase": "Posterior",
+      "plan_description": "Página para compradores potenciales",
+      "files_in_audit": [],
+      "files_confirmed_in_code": [],
+      "files_missing_from_code": [],
+      "provenance": "inherited_from_seed_map",
+      "validation": "needs_validation"
+    },
+    {
+      "module": "Corporate site",
+      "audit_status": null,
+      "plan_phase": "Posterior",
+      "plan_description": "Web institucional de SentYacht",
+      "files_in_audit": [],
+      "files_confirmed_in_code": [],
+      "files_missing_from_code": [],
+      "provenance": "inherited_from_seed_map",
+      "validation": "needs_validation"
+    },
+    {
+      "module": "n8n workflows",
+      "audit_status": null,
+      "plan_phase": "MVP",
+      "plan_description": "Meta Lead Ads → webhook → lead engine",
+      "files_in_audit": [],
+      "files_confirmed_in_code": [],
+      "files_missing_from_code": [],
+      "provenance": "inherited_from_seed_map",
+      "validation": "needs_validation"
+    },
+    {
+      "module": "CRM sync",
+      "audit_status": null,
+      "plan_phase": "Posterior",
+      "plan_description": "Exportación a herramientas externas",
+      "files_in_audit": [],
+      "files_confirmed_in_code": [],
+      "files_missing_from_code": [],
+      "provenance": "inherited_from_seed_map",
+      "validation": "needs_validation"
+    }
+  ],
+  "temporal_diff": {
+    "available": true,
+    "previous_generated_at": "2026-03-19T03:25:32.123941+00:00",
+    "files_added": [],
+    "files_removed": [],
+    "category_changes": {}
+  }
+}

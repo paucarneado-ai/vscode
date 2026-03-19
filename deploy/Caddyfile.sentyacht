@@ -1,17 +1,24 @@
-# Sentyacht — Caddyfile
-# Usage: copy to /etc/caddy/Caddyfile, then: systemctl reload caddy
-#
-# For staging (before DNS): replace sentyacht.com with :80
-# or use the VPS IP directly. Caddy will skip HTTPS for bare IPs.
+# Sentyacht — Caddyfile (production template)
+# Not deployed directly — staging uses the heredoc in deploy-staging.sh.
+# Domain: sentyacht.es (Traefik handles SSL via EasyPanel proxy)
 
-sentyacht.com {
-    # API — reverse proxy to uvicorn (strip /api prefix)
-    handle /api/* {
+sentyacht.es {
+    # Public API — only POST /api/leads/intake/web is exposed
+    @intake {
+        method POST
+        path /api/leads/intake/web
+    }
+    handle @intake {
         uri strip_prefix /api
         reverse_proxy localhost:8000
     }
 
-    # Static files — single root serves / and /vender/ automatically
+    # Block all other /api/* requests
+    handle /api/* {
+        respond 403
+    }
+
+    # Static files — serves /es/, /en/, assets, etc.
     handle {
         file_server {
             root /home/sentyacht/site
