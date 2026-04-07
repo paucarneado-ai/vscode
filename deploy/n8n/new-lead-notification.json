@@ -1,0 +1,134 @@
+{
+  "name": "OpenClaw New Lead Notification",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Poll Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        200,
+        300
+      ],
+      "notes": "Default: every 5 minutes. Configurable in node settings. Timezone set at workflow level (Europe/Madrid)."
+    },
+    {
+      "parameters": {
+        "jsCode": "// OpenClaw New Lead Notification — detect & prepare\n// Paginated fetch with watermark-based dedup\n//\n// MVP trade-off: fetches /leads/{id}/pack per new lead (N+1 pattern).\n// Accepted for simplicity and logic reuse — OpenClaw pack contains\n// all enrichment (score, rating, next_action, alert) in one call.\n// For high-volume scenarios, a batch endpoint would be more efficient.\n\n// === CONFIGURATION — edit these after importing ===\nconst API_BASE = 'CONFIGURE_ME'; // e.g. 'http://localhost:8000'\nconst API_KEY = 'CONFIGURE_ME';  // OPENCLAW_API_KEY value, or '' for dev\n\nconst PAGE_SIZE = 50;\nconst MAX_PAGES = 20;\n\nconst staticData = $getWorkflowStaticData('global');\nconst lastSeenId = staticData.lastSeenId;\n\nconst http = require('http');\n\nfunction apiFetch(path) {\n  return new Promise((resolve, reject) => {\n    const headers = { 'Content-Type': 'application/json' };\n    if (API_KEY && API_KEY !== 'CONFIGURE_ME') {\n      headers['X-API-Key'] = API_KEY;\n    }\n    http.get(`${API_BASE}${path}`, { headers }, (res) => {\n      let body = '';\n      res.on('data', chunk => body += chunk);\n      res.on('end', () => {\n        if (res.statusCode >= 400) {\n          reject(new Error(`API ${path} returned ${res.statusCode}`));\n          return;\n        }\n        try { resolve(JSON.parse(body)); }\n        catch (e) { reject(new Error(`Invalid JSON from ${path}`)); }\n      });\n    }).on('error', reject);\n  });\n}\n\n// First-run seed: set watermark to current max, send nothing\nif (lastSeenId === undefined || lastSeenId === null) {\n  const leads = await apiFetch('/leads?limit=1');\n  if (leads.length > 0) {\n    staticData.lastSeenId = leads[0].id;\n  }\n  // Zero leads in system: leave watermark unset, retry next poll\n  return [];\n}\n\n// Paginated detection with in-memory dedup\nconst seenIds = new Set();\nconst newLeads = [];\n\nfor (let page = 0; page < MAX_PAGES; page++) {\n  const offset = page * PAGE_SIZE;\n  const leads = await apiFetch(`/leads?limit=${PAGE_SIZE}&offset=${offset}`);\n  if (leads.length === 0) break;\n\n  let reachedOld = false;\n  for (const lead of leads) {\n    if (lead.id <= lastSeenId) { reachedOld = true; break; }\n    if (!seenIds.has(lead.id)) {\n      seenIds.add(lead.id);\n      newLeads.push(lead);\n    }\n  }\n  if (reachedOld) break;\n  if (leads.length < PAGE_SIZE) break;\n}\n\nif (newLeads.length === 0) return [];\n\n// Sort oldest-first for chronological notification\nnewLeads.sort((a, b) => a.id - b.id);\n\n// Fetch packs and format messages\nconst results = [];\n\nfor (const lead of newLeads) {\n  const pack = await apiFetch(`/leads/${lead.id}/pack`);\n\n  // Parse notes field\n  const notes = pack.notes || '';\n  const noteMap = {};\n\n  if (notes.startsWith('@ext:')) {\n    try {\n      const ext = JSON.parse(notes.substring(5));\n      if (ext.phone) noteMap['phone'] = ext.phone;\n      if (ext.metadata) {\n        for (const [k, v] of Object.entries(ext.metadata)) {\n          noteMap[k.toLowerCase()] = String(v);\n        }\n      }\n    } catch (e) { /* fallback below */ }\n  }\n\n  if (Object.keys(noteMap).length === 0) {\n    for (const line of notes.split('\\n')) {\n      const idx = line.indexOf(':');\n      if (idx > 0) {\n        const key = line.substring(0, idx).trim().toLowerCase();\n        const val = line.substring(idx + 1).trim();\n        if (val) noteMap[key] = val;\n      }\n    }\n  }\n\n  const phone = noteMap['phone'] || noteMap['telefono'] || noteMap['tel'] || 'N/A';\n  const boatType = noteMap['boat type'] || noteMap['tipo'] || noteMap['type'] || 'N/A';\n  const eslora = noteMap['length'] || noteMap['eslora'] || noteMap['loa'] || 'N/A';\n  const brand = noteMap['brand'] || noteMap['marca'] || noteMap['model'] || 'N/A';\n\n  const lines = [];\n  if (pack.alert) { lines.push('\\u{1F6A8} URGENTE'); lines.push(''); }\n  lines.push('Nuevo lead en Sentyacht');\n  lines.push('');\n  lines.push(`Nombre: ${pack.name}`);\n  lines.push(`Email: ${pack.email}`);\n  lines.push(`Telefono: ${phone}`);\n  lines.push(`Tipo: ${boatType}`);\n  lines.push(`Eslora: ${eslora}`);\n  lines.push(`Marca: ${brand}`);\n  lines.push(`Score: ${pack.score} (${pack.rating})`);\n  lines.push(`Accion: ${pack.next_action}`);\n  lines.push(`Fuente: ${pack.source}`);\n\n  results.push({ json: { text: lines.join('\\n'), lead_id: pack.lead_id } });\n}\n\nreturn results;"
+      },
+      "id": "detect-and-prepare",
+      "name": "Detect & Prepare",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ],
+      "notes": "Paginated fetch of new leads with watermark-based dedup. SETUP: edit API_BASE and API_KEY constants at the top of the code. First run seeds the watermark without sending."
+    },
+    {
+      "parameters": {
+        "chatId": "CONFIGURE_ME",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "disable_web_page_preview": true
+        }
+      },
+      "id": "send-telegram",
+      "name": "Send to Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        760,
+        300
+      ],
+      "notes": "SETUP: 1) Create Telegram API credential with your bot token (same as daily-ops-snapshot). 2) Replace CONFIGURE_ME with your Telegram chat ID.",
+      "credentials": {
+        "telegramApi": {
+          "id": "CONFIGURE_ME",
+          "name": "OpenClaw Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Update watermark — only runs after successful Telegram send\nconst staticData = $getWorkflowStaticData('global');\nconst items = $input.all();\nif (items.length === 0) return [];\nconst maxId = Math.max(...items.map(i => i.json.lead_id));\nstaticData.lastSeenId = maxId;\nreturn [{ json: { updated: true, lastSeenId: maxId, count: items.length } }];"
+      },
+      "id": "update-watermark",
+      "name": "Update Watermark",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        300
+      ],
+      "notes": "Advances lastSeenId only after all Telegram messages sent successfully. If Telegram fails, watermark stays — next poll retries."
+    }
+  ],
+  "connections": {
+    "Poll Every 5 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Detect & Prepare",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect & Prepare": {
+      "main": [
+        [
+          {
+            "node": "Send to Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to Telegram": {
+      "main": [
+        [
+          {
+            "node": "Update Watermark",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "timezone": "Europe/Madrid",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all",
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "openclaw"
+    },
+    {
+      "name": "new-lead"
+    },
+    {
+      "name": "mvp"
+    }
+  ],
+  "meta": {
+    "instanceId": "",
+    "templateCredsSetupCompleted": false
+  }
+}

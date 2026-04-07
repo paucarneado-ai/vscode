@@ -1,0 +1,76 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls *)",
+      "Bash(dir *)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(find *)",
+      "Bash(tree *)",
+      "Bash(wc *)",
+      "Bash(type *)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git branch*)",
+      "Bash(docker compose config*)",
+      "Bash(docker compose ps*)",
+      "Bash(docker compose up*)",
+      "Bash(docker compose down*)",
+      "Bash(docker compose build*)",
+      "Bash(pip list*)",
+      "Bash(pip show*)",
+      "Bash(python -m pytest*)",
+      "Bash(ruff check*)",
+      "Bash(ruff format*)"
+    ],
+    "deny": [
+      "Bash(cat .env)",
+      "Bash(cat .env.*)",
+      "Bash(cat *.env)",
+      "Bash(cat *.pem)",
+      "Bash(cat *.key)",
+      "Bash(cat *secret*)",
+      "Bash(cat *credential*)",
+      "Bash(cat secrets/*)",
+      "Bash(head .env*)",
+      "Bash(tail .env*)",
+      "Bash(type .env*)",
+      "Bash(*API_KEY*)",
+      "Bash(*SECRET*)",
+      "Bash(rm -rf *)",
+      "Bash(git push --force*)",
+      "Bash(git reset --hard*)"
+    ]
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/check_temp_rules.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python scripts/hooks/blocked_paths_guard.py"
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "python .claude/hooks/statusline_temp_rules.py"
+  }
+}

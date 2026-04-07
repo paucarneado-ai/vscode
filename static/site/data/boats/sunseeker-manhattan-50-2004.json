@@ -1,0 +1,55 @@
+{
+  "slug": "sunseeker-manhattan-50-2004",
+  "name": "Sunseeker Manhattan 50",
+  "brand": "Sunseeker",
+  "type": "motor",
+  "year": 2004,
+  "price": 359000,
+  "length": 15.66,
+  "beam": 4.42,
+  "draft": 1.17,
+  "location": "El Masnou",
+  "condition": "used",
+  "badges": [
+    "stock"
+  ],
+  "engines": "2× MAN 800 CV",
+  "fuel": "Diésel",
+  "cabins": 3,
+  "berths": 6,
+  "heads": 2,
+  "description": {
+    "es": "Sunseeker Manhattan 50, un icono del diseño británico. Tres cabinas, dos baños, flybridge práctico. Mecánica revisada y en buen estado general. Disponible para visita inmediata en El Masnou.",
+    "en": "Sunseeker Manhattan 50, an icon of British design. Three cabins, two heads, practical flybridge. Mechanically surveyed and in good overall condition. Available for immediate viewing in El Masnou."
+  },
+  "specs": {
+    "es": {
+      "Eslora": "15,66 m",
+      "Manga": "4,42 m",
+      "Calado": "1,17 m",
+      "Motor": "2× MAN 800 CV",
+      "Combustible": "Diésel",
+      "Cabinas": "3",
+      "Literas": "6",
+      "Baños": "2",
+      "Año": "2004",
+      "Puerto": "El Masnou"
+    },
+    "en": {
+      "Length": "15.66 m",
+      "Beam": "4.42 m",
+      "Draft": "1.17 m",
+      "Engine": "2× MAN 800 HP",
+      "Fuel": "Diesel",
+      "Cabins": "3",
+      "Berths": "6",
+      "Heads": "2",
+      "Year": "2004",
+      "Port": "El Masnou"
+    }
+  },
+  "images": [
+    "sunseeker-manhattan-50-1.jpg"
+  ],
+  "visible": true
+}

@@ -1,0 +1,53 @@
+{
+  "slug": "astondoa-82-glx-2008",
+  "name": "Astondoa 82 GLX",
+  "brand": "Astondoa",
+  "type": "motor",
+  "year": 2008,
+  "price": 1300000,
+  "length": 24.99,
+  "beam": 5.9,
+  "draft": 1.8,
+  "location": "Barcelona",
+  "condition": "used",
+  "badges": [],
+  "engines": "2× MAN 1360 CV",
+  "fuel": "Diésel",
+  "cabins": 4,
+  "berths": 8,
+  "heads": 4,
+  "description": {
+    "es": "Yate flybridge de gran eslora en excelente estado. Cuatro cabinas, cuatro baños, amplio salón y flybridge con bimini. Mantenimiento al día con revisiones anuales. Ideal para cruceros largos por el Mediterráneo.",
+    "en": "Large flybridge yacht in excellent condition. Four cabins, four heads, spacious saloon and flybridge with bimini. Fully maintained with annual surveys. Ideal for extended Mediterranean cruising."
+  },
+  "specs": {
+    "es": {
+      "Eslora": "24,99 m",
+      "Manga": "5,90 m",
+      "Calado": "1,80 m",
+      "Motor": "2× MAN 1360 CV",
+      "Combustible": "Diésel",
+      "Cabinas": "4",
+      "Literas": "8",
+      "Baños": "4",
+      "Año": "2008",
+      "Puerto": "Barcelona"
+    },
+    "en": {
+      "Length": "24.99 m",
+      "Beam": "5.90 m",
+      "Draft": "1.80 m",
+      "Engine": "2× MAN 1360 HP",
+      "Fuel": "Diesel",
+      "Cabins": "4",
+      "Berths": "8",
+      "Heads": "4",
+      "Year": "2008",
+      "Port": "Barcelona"
+    }
+  },
+  "images": [
+    "astondoa-82-glx-1.jpg"
+  ],
+  "visible": true
+}

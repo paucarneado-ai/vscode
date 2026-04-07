@@ -1,0 +1,27 @@
+# Sentyacht — Caddyfile (production template)
+# Not deployed directly — staging uses the heredoc in deploy-staging.sh.
+# Domain: sentyacht.es (Traefik handles SSL via EasyPanel proxy)
+
+sentyacht.es {
+    # Public API — only POST /api/leads/intake/web is exposed
+    @intake {
+        method POST
+        path /api/leads/intake/web
+    }
+    handle @intake {
+        uri strip_prefix /api
+        reverse_proxy localhost:8000
+    }
+
+    # Block all other /api/* requests
+    handle /api/* {
+        respond 403
+    }
+
+    # Static files — serves /es/, /en/, assets, etc.
+    handle {
+        file_server {
+            root /home/sentyacht/site
+        }
+    }
+}

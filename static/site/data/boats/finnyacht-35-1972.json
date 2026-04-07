@@ -1,0 +1,56 @@
+{
+  "slug": "finnyacht-35-1972",
+  "name": "Finnyacht FINM Cleaper 35",
+  "brand": "Finnyacht",
+  "type": "sail",
+  "year": 1972,
+  "price": 28000,
+  "length": 10.44,
+  "beam": 3.2,
+  "draft": 1.8,
+  "location": "El Masnou",
+  "condition": "used",
+  "badges": [
+    "stock",
+    "price-drop"
+  ],
+  "engines": "1× Volvo 28 CV",
+  "fuel": "Diésel",
+  "cabins": 2,
+  "berths": 5,
+  "heads": 1,
+  "description": {
+    "es": "Velero clásico finlandés Finnyacht 35 con carácter y encanto. Dos cabinas, un baño, bañera protegida. Construcción nórdica robusta pensada para navegación oceánica. Un velero con historia.",
+    "en": "Classic Finnish sailboat Finnyacht 35 with character and charm. Two cabins, one head, protected cockpit. Robust Nordic construction designed for ocean sailing. A sailboat with history."
+  },
+  "specs": {
+    "es": {
+      "Eslora": "10,44 m",
+      "Manga": "3,20 m",
+      "Calado": "1,80 m",
+      "Motor": "1× Volvo 28 CV",
+      "Combustible": "Diésel",
+      "Cabinas": "2",
+      "Literas": "5",
+      "Baños": "1",
+      "Año": "1972",
+      "Puerto": "El Masnou"
+    },
+    "en": {
+      "Length": "10.44 m",
+      "Beam": "3.20 m",
+      "Draft": "1.80 m",
+      "Engine": "1× Volvo 28 HP",
+      "Fuel": "Diesel",
+      "Cabins": "2",
+      "Berths": "5",
+      "Heads": "1",
+      "Year": "1972",
+      "Port": "El Masnou"
+    }
+  },
+  "images": [
+    "finnyacht-35-1.jpg"
+  ],
+  "visible": true
+}

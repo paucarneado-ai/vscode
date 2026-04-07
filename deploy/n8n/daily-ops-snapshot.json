@@ -1,0 +1,155 @@
+{
+  "name": "OpenClaw Daily Ops Snapshot",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule (Mon-Fri 09:00)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300],
+      "notes": "Default: 09:00 Europe/Madrid, Mon-Fri. Configure schedule in node settings. Timezone is set at workflow level in workflow settings."
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:8000/internal/ops/snapshot",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 15000,
+          "fullResponse": false
+        }
+      },
+      "id": "fetch-ops-snapshot",
+      "name": "Fetch Ops Snapshot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 200],
+      "notes": "GET /internal/ops/snapshot — system-level counts for the header line. SETUP: change URL to your OpenClaw API base. Auth is handled by the Header Auth credential (X-API-Key).",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:8000/internal/daily-actions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 15000,
+          "fullResponse": false
+        }
+      },
+      "id": "fetch-daily-actions",
+      "name": "Fetch Daily Actions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 400],
+      "notes": "GET /internal/daily-actions — the core data surface. SETUP: change URL to your OpenClaw API base. Auth is handled by the Header Auth credential (X-API-Key)."
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "merge-data",
+      "name": "Merge Snapshot + Actions",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// OpenClaw Daily Ops Snapshot — message formatter\n// Consumes: /internal/ops/snapshot + /internal/daily-actions\n// Produces: a single Telegram-ready message string\n\nconst snapshot = $input.all()[0]?.json || {};\nconst actions = $input.all()[1]?.json || $input.all()[0]?.json || {};\n\n// --- Helpers ---\nfunction pluralize(n, singular, plural) {\n  return n === 1 ? `${n} ${singular}` : `${n} ${plural || singular + 's'}`;\n}\n\nfunction timeSince(dateStr) {\n  if (!dateStr) return null;\n  const ms = Date.now() - new Date(dateStr.replace(' ', 'T') + 'Z').getTime();\n  const hours = Math.floor(ms / 3600000);\n  if (hours < 1) return 'hace menos de 1h';\n  if (hours < 24) return `hace ${hours}h`;\n  const days = Math.floor(hours / 24);\n  return `hace ${days}d`;\n}\n\n// --- Date header ---\nconst now = new Date();\nconst dateStr = now.toISOString().slice(0, 10);\nconst dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];\nconst dayName = dayNames[now.getDay()];\n\nlet lines = [];\nlines.push(`\\u{1F4CB} OpenClaw Daily Ops — ${dayName} ${dateStr}`);\nlines.push('');\n\n// --- System header from ops/snapshot ---\nif (snapshot.total_leads !== undefined) {\n  const parts = [\n    `${snapshot.total_leads} leads`,\n    `${snapshot.actionable} accionables`,\n    `${snapshot.urgent} urgentes`,\n  ];\n  if (snapshot.claimed > 0) parts.push(`${snapshot.claimed} claimed`);\n  lines.push(`\\u{1F4CA} ${parts.join(' | ')}`);\n  lines.push('');\n}\n\n// --- HOY PRIMERO (max 5 items, prioritized) ---\nconst summary = actions.summary || {};\nconst review = actions.top_review || [];\nconst clientReady = actions.top_client_ready || [];\nconst followup = actions.top_followup || [];\nconst warnings = actions.source_warnings || [];\n\nlet hoyItems = [];\n\n// Priority 1: urgent review items (alert=true)\nfor (const item of review) {\n  if (item.alert && hoyItems.length < 5) {\n    hoyItems.push(`\\u{1F6A8} #${item.lead_id} ${item.name} — score ${item.score} — REVISAR URGENTE`);\n  }\n}\n\n// Priority 2: client-ready leads (highest value action)\nfor (const item of clientReady) {\n  if (hoyItems.length < 5) {\n    hoyItems.push(`\\u{1F4E4} #${item.lead_id} ${item.name} — score ${item.score} — ENVIAR A CLIENTE`);\n  }\n}\n\n// Priority 3: followup not recently contacted (stale)\nfor (const item of followup) {\n  if (!item.recently_contacted && hoyItems.length < 5) {\n    const attempts = item.contact_attempts_count || 0;\n    hoyItems.push(`\\u{1F4DE} #${item.lead_id} ${item.name} — score ${item.score} — ${attempts} intentos — SIN CONTACTO RECIENTE`);\n  }\n}\n\nif (hoyItems.length > 0) {\n  lines.push(`\\u{1F3AF} HOY PRIMERO`);\n  for (const item of hoyItems) {\n    lines.push(`  ${item}`);\n  }\n  lines.push('');\n}\n\n// --- REVISAR ---\nif (review.length > 0) {\n  lines.push(`\\u{1F50D} REVISAR (${summary.pending_review} pendientes)`);\n  for (const item of review) {\n    const alertMark = item.alert ? ' \\u26A0\\uFE0F' : '';\n    lines.push(`  \\u2022 #${item.lead_id} ${item.name} — score ${item.score} — ${item.next_action}${alertMark}`);\n  }\n  lines.push('');\n}\n\n// --- LISTOS PARA ENVIAR ---\nif (clientReady.length > 0) {\n  lines.push(`\\u{1F4E4} LISTOS PARA ENVIAR (${summary.client_ready})`);\n  for (const item of clientReady) {\n    lines.push(`  \\u2022 #${item.lead_id} ${item.name} — score ${item.score}`);\n  }\n  lines.push('');\n}\n\n// --- FOLLOW-UP ---\nif (followup.length > 0) {\n  lines.push(`\\u{1F4DE} FOLLOW-UP (${summary.followup_candidates} pendientes)`);\n  for (const item of followup) {\n    const attempts = item.contact_attempts_count || 0;\n    let contactInfo;\n    if (attempts === 0) {\n      contactInfo = 'sin contactar';\n    } else {\n      const ago = timeSince(item.last_contacted_at);\n      contactInfo = `${attempts} intentos — ${ago}`;\n      if (item.recently_contacted) contactInfo += ' \\u2705';\n    }\n    lines.push(`  \\u2022 #${item.lead_id} ${item.name} — score ${item.score} — ${contactInfo}`);\n  }\n  lines.push('');\n}\n\n// --- ALERTAS DE FUENTE ---\nif (warnings.length > 0) {\n  lines.push(`\\u26A0\\uFE0F ALERTAS DE FUENTE`);\n  for (const w of warnings) {\n    lines.push(`  \\u2022 ${w.source} — ${w.recommendation} — ${w.rationale}`);\n  }\n  lines.push('');\n}\n\n// --- Empty state ---\nif (review.length === 0 && clientReady.length === 0 && followup.length === 0 && warnings.length === 0) {\n  lines.push(`\\u2705 Sin acciones pendientes hoy.`);\n  lines.push('');\n}\n\n// --- Footer ---\nlines.push(`Generado: ${actions.generated_at || now.toISOString()}`);\n\nreturn [{ json: { text: lines.join('\\n') } }];\n"
+      },
+      "id": "format-message",
+      "name": "Format Telegram Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [920, 300],
+      "notes": "Formats the merged API data into a single Telegram-ready text message. HOY PRIMERO section picks top 5 most actionable items across categories."
+    },
+    {
+      "parameters": {
+        "chatId": "CONFIGURE_ME",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "disable_web_page_preview": true
+        }
+      },
+      "id": "send-telegram",
+      "name": "Send to Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1160, 300],
+      "notes": "SETUP: 1) Create Telegram API credential with your bot token. 2) Replace CONFIGURE_ME with your Telegram chat ID.",
+      "credentials": {
+        "telegramApi": {
+          "id": "CONFIGURE_ME",
+          "name": "OpenClaw Telegram Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule (Mon-Fri 09:00)": {
+      "main": [
+        [
+          { "node": "Fetch Ops Snapshot", "type": "main", "index": 0 },
+          { "node": "Fetch Daily Actions", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fetch Ops Snapshot": {
+      "main": [
+        [
+          { "node": "Merge Snapshot + Actions", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fetch Daily Actions": {
+      "main": [
+        [
+          { "node": "Merge Snapshot + Actions", "type": "main", "index": 1 }
+        ]
+      ]
+    },
+    "Merge Snapshot + Actions": {
+      "main": [
+        [
+          { "node": "Format Telegram Message", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Format Telegram Message": {
+      "main": [
+        [
+          { "node": "Send to Telegram", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "timezone": "Europe/Madrid",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all",
+    "executionOrder": "v1"
+  },
+  "tags": [
+    { "name": "openclaw" },
+    { "name": "daily-ops" },
+    { "name": "mvp" }
+  ],
+  "meta": {
+    "instanceId": "",
+    "templateCredsSetupCompleted": false
+  }
+}

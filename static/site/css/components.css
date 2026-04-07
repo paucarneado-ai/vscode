@@ -1,0 +1,156 @@
+/* Sentyacht — Components
+   Reusable pieces: buttons, cards, credential blocks, contact items.
+   These classes are stable — new pages use them, not create new ones. */
+
+/* Buttons */
+.btn {
+    display: inline-block;
+    padding: 14px 32px;
+    font-size: var(--text-base);
+    font-weight: 600;
+    font-family: var(--font-body);
+    border-radius: var(--border-radius);
+    border: none;
+    cursor: pointer;
+    text-align: center;
+    transition: background 0.2s, color 0.2s;
+    letter-spacing: 0.2px;
+}
+.btn--primary {
+    background: var(--color-gold);
+    color: var(--color-navy-dark);
+}
+.btn--primary:hover {
+    background: var(--color-gold-hover);
+}
+.btn--outline {
+    background: transparent;
+    color: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+}
+.btn--outline:hover {
+    border-color: rgba(255, 255, 255, 0.6);
+    color: var(--color-white);
+}
+.btn--navy {
+    background: var(--color-navy);
+    color: var(--color-white);
+}
+.btn--navy:hover {
+    background: var(--color-navy-dark);
+}
+
+/* Cards */
+.card {
+    background: var(--color-white);
+    border-radius: var(--border-radius-lg);
+    padding: var(--space-lg);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--color-border-light);
+}
+.card__title {
+    font-family: var(--font-heading);
+    font-size: var(--text-lg);
+    font-weight: 400;
+    color: var(--color-navy);
+    margin-bottom: var(--space-sm);
+}
+.card__text {
+    font-size: var(--text-sm);
+    color: var(--color-text-secondary);
+    line-height: 1.6;
+}
+
+/* Credential block */
+.credential {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-sm);
+    padding: var(--space-sm) 0;
+}
+.credential__label {
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+    white-space: nowrap;
+}
+.credential__value {
+    font-size: var(--text-sm);
+    color: var(--color-text);
+    font-weight: 600;
+}
+
+/* Divider */
+.divider {
+    width: 40px;
+    height: 2px;
+    background: var(--color-gold);
+    margin: var(--space-lg) 0;
+}
+
+/* Contact item */
+.contact-item {
+    padding: var(--space-sm) 0;
+}
+.contact-item__label {
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+}
+.contact-item__value {
+    font-size: var(--text-base);
+    color: var(--color-text);
+    font-weight: 500;
+}
+.contact-item__value a {
+    color: var(--color-navy-light);
+}
+.contact-item__value a:hover {
+    text-decoration: underline;
+}
+
+/* Contact items on navy background — override dark-bg defaults */
+.section--navy .contact-item__label {
+    color: rgba(255, 255, 255, 0.55);
+}
+.section--navy .contact-item__value {
+    color: var(--color-white);
+}
+.section--navy .contact-item__value a {
+    color: var(--color-gold);
+}
+.section--navy .contact-item__value a:hover {
+    color: var(--color-white);
+}
+
+/* Definition list — for future boat specs */
+.specs {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--space-xs) var(--space-md);
+    font-size: var(--text-sm);
+}
+.specs dt {
+    color: var(--color-text-muted);
+    font-weight: 400;
+}
+.specs dd {
+    color: var(--color-text);
+    font-weight: 500;
+}
+
+/* CTA group */
+.cta-group {
+    display: flex;
+    gap: var(--space-md);
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+/* Responsive components */
+@media (max-width: 480px) {
+    .btn { padding: 12px 24px; font-size: var(--text-sm); }
+    .cta-group { flex-direction: column; align-items: stretch; }
+    .cta-group .btn { text-align: center; }
+}
